@@ -1,0 +1,91 @@
+# Benchmark config for comparing code-query tools on token efficiency.
+# Edit freely: add/remove tools or prompts, change the model/provider.
+#
+# For each (tool, prompt) the runner invokes:
+#   hermes -z -m <model> --provider <provider>
+#          --usage-file <results_dir>/<tool>-<prompt>.json
+#          "<tool_instruction><prompt text>"
+# and records the JSON usage report (tokens, cost, api_calls, duration).
+
+model: gpt-5.6-sol
+provider: github-copilot
+
+# Kernel tree the prompts are answered against. Both index-backed tools have
+# already indexed this tree; see `index:` below for how to rebuild.
+kernel_dir: /home/acelan/workspace/linux
+
+# Where per-model run dirs are written: artifacts/<model>-<provider>/
+# (each model run gets its own durable subdir, so runs never clobber each
+# other). Generate HTML/markdown reports from these on demand with report.py.
+results_dir: artifacts
+
+# One-shot prompt instruction prepended to each query so the agent reaches
+# for the tool under test instead of falling back to default ripgrep.
+tool_instruction:
+  grep: "Use grep to do any code related query. "
+  ripgrep: "Use ripgrep to do any code related query. "
+  codebase-memory-mcp: "Use codebase-memory-mcp to do any code related query. "
+  codegraph: "Use codegraph to do any code related query. "
+
+# Tool definitions. `index.run` is executed (cwd = kernel_dir) only when
+# --ensure-index is passed; it is never run implicitly, because a full kernel
+# index build takes a long time and both indexes already exist. `index.check`
+# is a command whose stdout is probed for `ready` to skip an existing index.
+#
+# `toolsets` is the hard control that isolates each tool: the -z agent is
+# launched with `-t <toolsets>`, so it can ONLY call tools from those
+# toolsets. This stops it from silently falling back to search_files
+# (ripgrep) / terminal (grep) when "use codegraph" is in the prompt — prompt
+# wording alone is a weak control. Omit `toolsets` for a tool to run it with
+# the full default toolset (prompt-only emphasis, i.e. apples-to-apples with
+# older runs that used all tools).
+tools:
+  grep:
+    enabled: true
+    toolsets: "file"
+  ripgrep:
+    enabled: true
+    toolsets: "file,terminal"
+  codebase-memory-mcp:
+    enabled: true
+    toolsets: "codebase-memory-mcp"
+    index:
+      check: ["codebase-memory-mcp", "cli", "index_status", "--project", "home-acelan-workspace-linux"]
+      run: ["codebase-memory-mcp", "cli", "index_repository", "--repo-path", "{kernel_dir}", "--mode", "full"]
+  codegraph:
+    enabled: true
+    toolsets: "codegraph"
+    index:
+      check: ["codegraph", "status", "."]
+      check_mode: rc
+      run: ["codegraph", "index", "."]
+
+# Prompt corpus. `id` names the result file; `text` is appended to the tool
+# instruction above to form the full -z query.
+prompts:
+  - id: callers-drm-register
+    text: >-
+      In drivers/gpu/drm/i915, list every function that directly calls
+      drm_dev_register or pm_runtime_get_sync. For each direct caller, list
+      all functions that call it (one hop up). Report any call cycle.
+  - id: pm-suspend-trace
+    text: >-
+      Trace the full call chain that reaches i915_pm_suspend from every PCI PM
+      callback in drivers/gpu/drm/i915, then list which of those callers also
+      call i915_pm_runtime_suspend, and show the data flow of dev_priv from
+      i915_drm_suspend down to intel_display_suspend.
+  - id: typec-kernfs-ucsi-rootcause
+    text: >-
+      A Dell Pro Precision 5 16 (BIOS 0.4.53) running kernel 6.17.0-1011-oem
+      emits this warning at boot:
+      "WARNING: CPU: 6 PID: 55 at fs/kernfs/dir.c:1706
+      kernfs_remove_by_name_ns+0xe9/0xf0 — kernfs: can not remove 'typec',
+      no directory", raised from typec_unregister_partner ->
+      ucsi_unregister_partner inside ucsi_handle_connector_change (workqueue
+      events, Comm: kworker/6:0).
+      Find the root cause in the kernel source and determine whether an
+      existing fix is already present in this tree or upstream. Identify the
+      exact offending function(s) in drivers/usb/typec (and
+      drivers/usb/typec/ucsi), explain why kernfs_remove_by_name_ns fails with
+      ENOENT ('no directory'), and report the upstream fix (commit/series) if
+      one exists, citing the file:line evidence for each step of the chain.
