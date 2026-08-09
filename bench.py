@@ -273,6 +273,23 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", default="benchmark.yaml")
+    ap.add_argument("--model-preset", default=None,
+                    help="Name of a preset in --models-file (default "
+                         "models.yaml), e.g. --model-preset sonnet5. Sets "
+                         "model+provider from the preset; explicit --model/"
+                         "--provider still override it. Lets one shared "
+                         "config file benchmark any number of models "
+                         "without a benchmark-<model>.yaml per model.")
+    ap.add_argument("--models-file", default="models.yaml",
+                    help="Path to the model-preset YAML (default: "
+                         "models.yaml)")
+    ap.add_argument("--model", default=None,
+                    help="Override config/preset model (e.g. --model "
+                         "gpt-5.6-sol). Combine with --provider.")
+    ap.add_argument("--provider", default=None,
+                    help="Override config/preset provider (e.g. --provider "
+                         "openrouter). Required alongside --model if the "
+                         "config's provider doesn't match the new model.")
     ap.add_argument("--kernel-dir", default=None,
                     help="Override config kernel_dir")
     ap.add_argument("--tools", default=None,
@@ -314,13 +331,40 @@ def main():
     cfg = load_config(args.config)
     if args.no_transcripts:
         cfg["capture_transcripts"] = False
+    if args.model_preset:
+        if not os.path.exists(args.models_file):
+            raise SystemExit(f"--model-preset given but {args.models_file} not found")
+        with open(args.models_file, "r", encoding="utf-8") as f:
+            presets = yaml.safe_load(f) or {}
+        if args.model_preset not in presets:
+            raise SystemExit(
+                f"unknown preset '{args.model_preset}' in {args.models_file}; "
+                f"available: {', '.join(sorted(presets))}"
+            )
+        preset = presets[args.model_preset]
+        cfg["model"] = preset.get("model", cfg.get("model"))
+        cfg["provider"] = preset.get("provider", cfg.get("provider"))
+    if args.model:
+        cfg["model"] = args.model
+    if args.provider:
+        cfg["provider"] = args.provider
+    if not cfg.get("model") or not cfg.get("provider"):
+        raise SystemExit(
+            "no model/provider set. benchmark.yaml intentionally omits them "
+            "so every run picks one explicitly: pass --model-preset <name> "
+            "(see models.yaml) or --model <model> --provider <provider>."
+        )
     kernel_dir = args.kernel_dir or cfg.get("kernel_dir")
     # results_dir is the BASE (config, == artifacts/); this run lands in a
     # <model>-<provider>[-tag] subdir so per-model data never collides.
+    # model ids can contain "/" (e.g. deepseek/deepseek-v4-flash-0731) — use
+    # only the trailing segment so the dir name matches the existing
+    # artifacts/<model-basename>-<provider>/ convention instead of nesting.
     base_dir = args.results_dir or cfg.get("results_dir", "artifacts")
     model, provider = cfg["model"], cfg["provider"]
     tag = args.run_tag.strip()
-    run_dir_name = f"{model}-{provider}" + (f"-{tag}" if tag else "")
+    flat_model = model.rsplit("/", 1)[-1]
+    run_dir_name = f"{flat_model}-{provider}" + (f"-{tag}" if tag else "")
     results_dir = os.path.join(base_dir, run_dir_name)
     if args.kernel_dir:
         cfg["kernel_dir"] = args.kernel_dir

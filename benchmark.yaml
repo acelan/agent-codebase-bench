@@ -1,14 +1,15 @@
 # Benchmark config for comparing code-query tools on token efficiency.
-# Edit freely: add/remove tools or prompts, change the model/provider.
+# Edit freely: add/remove tools or prompts, change kernel_dir.
+#
+# model/provider are NOT set here — they must be given explicitly per run via
+# --model-preset <name> (see models.yaml) or --model/--provider. This is the
+# single shared config for every model; see models.yaml for named presets.
 #
 # For each (tool, prompt) the runner invokes:
 #   hermes -z -m <model> --provider <provider>
 #          --usage-file <results_dir>/<tool>-<prompt>.json
 #          "<tool_instruction><prompt text>"
 # and records the JSON usage report (tokens, cost, api_calls, duration).
-
-model: deepseek/deepseek-v4-flash-0731
-provider: openrouter
 
 # Kernel tree the prompts are answered against. Both index-backed tools have
 # already indexed this tree; see `index:` below for how to rebuild.
@@ -26,6 +27,8 @@ tool_instruction:
   ripgrep: "Use ripgrep to do any code related query. "
   codebase-memory-mcp: "Use codebase-memory-mcp to do any code related query. "
   codegraph: "Use codegraph to do any code related query. "
+  graft: "Use graft to do any code related query. "
+  repowise: "Use repowise to do any code related query. "
 
 # Tool definitions. `index.run` is executed (cwd = kernel_dir) only when
 # --ensure-index is passed; it is never run implicitly, because a full kernel
@@ -59,6 +62,20 @@ tools:
       check: ["codegraph", "status", "."]
       check_mode: rc
       run: ["codegraph", "index", "."]
+  graft:
+    enabled: true
+    toolsets: "graft"
+    index:
+      check: ["graft", "check", "{kernel_dir}"]
+      check_mode: rc
+      run: ["graft", "build", "--deep", "{kernel_dir}"]
+  repowise:
+    enabled: true
+    toolsets: "repowise"
+    index:
+      check: ["test", "-d", "{kernel_dir}/.repowise"]
+      check_mode: rc
+      run: ["repowise", "init", "{kernel_dir}"]
 
 # Prompt corpus. `id` names the result file; `text` is appended to the tool
 # instruction above to form the full -z query.

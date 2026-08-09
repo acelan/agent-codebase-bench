@@ -20,6 +20,8 @@ retrieval tools either shine or quietly fall back to ripgrep.
 | `ripgrep` | `file,terminal` (search_files + raw `rg`) |
 | `codebase-memory-mcp` | `codebase-memory-mcp` (MCP toolset only) |
 | `codegraph` | `codegraph` (MCP toolset only) |
+| `graft` | `graft` (MCP toolset only — [nanonets/graft](https://github.com/NanoNets/Graft)) |
+| `repowise` | `repowise` (MCP toolset only — [repowise-dev/repowise](https://github.com/repowise-dev/repowise)) |
 
 The `toolsets` restriction is the *hard* control: the agent physically cannot
 fall back to ripgrep/grep when told to use a graph tool, so the measurement
@@ -33,9 +35,8 @@ bench.py           # runs the (tool × prompt) matrix through hermes -z
 report.py          # generates HTML/markdown reports from saved artifacts
 htmlreport.py      # renders the self-contained comparison HTML
 transcript.py      # exports/parses the verbose per-iteration transcripts
-benchmark.yaml     # model, tools, prompts config (default = deepseek-v4-flash)
-benchmark-gpt5.6.yaml  # same matrix, gpt-5.6-sol on github-copilot
-benchmark-ds4.yaml     # same matrix, deepseek-v4-flash on openrouter
+benchmark.yaml     # tools, prompts, kernel_dir config (model comes from models.yaml)
+models.yaml        # named model/provider presets (--model-preset <name>)
 artifacts/         # durable per-model run dirs (gitignored)
 docs/              # architecture/implementation notes
 ```
@@ -60,10 +61,15 @@ never by re-running the agents and never by parsing rendered HTML.
 ## Prerequisites
 
 - `hermes` CLI available on `PATH` (the oneshot runner `hermes -z`).
-- For the index-backed tools: the kernel tree indexed, and both registered as
+- For the index-backed tools: the kernel tree indexed, and all registered as
   Hermes MCP servers in `~/.hermes/config.yaml`:
   - `codebase-memory-mcp` via `command: /home/acelan/.local/bin/codebase-memory-mcp`
   - `codegraph` via `command: codegraph, args: [serve, --mcp]`
+  - `graft` via `command: graft, args: [mcp, <kernel_dir>]` (built with
+    `graft build --deep <kernel_dir>`; see [nanonets/graft](https://github.com/NanoNets/Graft))
+  - `repowise` via `command: <path-to-venv>/bin/repowise, args: [mcp, <kernel_dir>]`
+    (installed with `uv pip install repowise`, indexed with
+    `repowise init <kernel_dir>`; see [repowise-dev/repowise](https://github.com/repowise-dev/repowise))
 - `python3` with `PyYAML`.
 
 ## Running a benchmark
@@ -71,11 +77,18 @@ never by re-running the agents and never by parsing rendered HTML.
 ```bash
 cd ~/workspace/agent-codebase-bench
 
-# Default model (from benchmark.yaml)
-python3 bench.py --config benchmark.yaml --kernel-dir ~/workspace/linux
+# Model must be given explicitly: --model-preset <name> (see models.yaml)
+# or --model <model> --provider <provider>.
+python3 bench.py --config benchmark.yaml --model-preset ds4 --kernel-dir ~/workspace/linux
 
-# A different model (each writes to its OWN artifacts/<model>-<provider>/ dir)
-python3 bench.py --config benchmark-gpt5.6.yaml --kernel-dir ~/workspace/linux
+# A named model preset from models.yaml (each writes to its OWN
+# artifacts/<model>-<provider>/ dir — presets never clobber each other)
+python3 bench.py --model-preset sonnet5
+python3 bench.py --model-preset gpt5.6
+python3 bench.py --model-preset ds4
+
+# Ad-hoc model without touching models.yaml at all
+python3 bench.py --model claude-opus-5 --provider github-copilot
 
 # Useful flags
 python3 bench.py --tools grep,ripgrep          # subset of tools
@@ -87,6 +100,13 @@ python3 bench.py --no-transcripts              # disable verbose capture
 python3 bench.py --ensure-index                # (re)build tool indexes first
 python3 bench.py --dry-run                     # print commands, run nothing
 ```
+
+**Adding a new model to benchmark:** add one entry to `models.yaml` (`name:
+{model, provider}`) and run `--model-preset <name>` — no new
+`benchmark-<model>.yaml` file needed. `benchmark.yaml` (tools, prompts,
+kernel_dir) stays the single source of truth for the query matrix; only
+model/provider vary per preset. `--model`/`--provider` still work directly
+for a one-off run you don't want to name in `models.yaml`.
 
 **Runtime reality:** each `(tool, prompt)` cell is a full `hermes -z` LLM agent
 run and takes roughly 1–26 minutes (a codegraph run once hit ~26 min). A
