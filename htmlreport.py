@@ -488,21 +488,30 @@ def _overview_dashboard_html(grouped):
                 agg["tool_calls"] += s.get("tool_calls") or 0
             testcases_per_tool.setdefault(tool, set()).add(prompt)
 
-    def _agg_table(bucket, name_col, badge=False):
+    def _agg_table(bucket, name_col, badge=False, show_baseline_delta=False):
         if not bucket:
             return ""
         cost_th = "<th class='num'>avg_cost_usd</th>" if any_known_cost else ""
+        baseline_th = (
+            "<th class='num' title='avg_tokens vs grep baseline'>vs grep</th>"
+            if show_baseline_delta and _BASELINE_TOOL in bucket else ""
+        )
         rows = [
             f"<table class='cmp agg'><thead><tr><th>{name_col}</th>"
             "<th class='num'>runs</th><th class='num'>avg_tokens</th>"
             "<th class='num'>total_tokens</th>" + cost_th +
             "<th class='num'>avg_wall_s</th><th class='num'>avg_api_calls</th>"
-            "<th class='num'>avg_tool_calls</th></tr></thead><tbody>"
+            "<th class='num'>avg_tool_calls</th>" + baseline_th +
+            "</tr></thead><tbody>"
         ]
         best_avg_tok = min(
             (a["total_tokens"] / a["n"] for a in bucket.values() if a["n"]),
             default=None,
         )
+        baseline_avg_tok = None
+        if show_baseline_delta and _BASELINE_TOOL in bucket:
+            gb = bucket[_BASELINE_TOOL]
+            baseline_avg_tok = gb["total_tokens"] / max(gb["n"], 1)
         for key in sorted(bucket, key=lambda k: bucket[k]["total_tokens"] / max(bucket[k]["n"], 1)):
             a = bucket[key]
             n = max(a["n"], 1)
@@ -515,6 +524,12 @@ def _overview_dashboard_html(grouped):
                     f"<td class='num'>{_fmt_num(a['cost']/a['cost_n'], 4)}</td>"
                     if a["cost_n"] else "<td class='num'>—</td>"
                 )
+            baseline_td = ""
+            if show_baseline_delta and _BASELINE_TOOL in bucket:
+                if key == _BASELINE_TOOL:
+                    baseline_td = "<td class='num meta'>baseline</td>"
+                else:
+                    baseline_td = _delta_cell(avg_tok, baseline_avg_tok)
             rows.append(
                 "<tr>"
                 f"<td>{label}</td>"
@@ -525,6 +540,7 @@ def _overview_dashboard_html(grouped):
                 f"<td class='num'>{_fmt_num(a['wall']/n, 1)}</td>"
                 f"<td class='num'>{_fmt_num(a['api_calls']/n, 1)}</td>"
                 f"<td class='num'>{_fmt_num(a['tool_calls']/n, 1)}</td>"
+                + baseline_td +
                 "</tr>"
             )
         rows.append("</tbody></table>")
@@ -539,7 +555,7 @@ def _overview_dashboard_html(grouped):
         + ("" if any_known_cost else " Cost is omitted: no provider in this run reports a known cost.")
         + "</p>"
         "<div class='dash-grid'>"
-        "<div class='dash-col'><h3>By tool</h3>" + _agg_table(by_tool, "tool", badge=True) + "</div>"
+        "<div class='dash-col'><h3>By tool</h3>" + _agg_table(by_tool, "tool", badge=True, show_baseline_delta=True) + "</div>"
         "<div class='dash-col'><h3>By model</h3>" + _agg_table(by_model, "model") + "</div>"
         "</div>"
         "</section>"
