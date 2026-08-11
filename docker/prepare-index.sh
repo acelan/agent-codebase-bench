@@ -32,6 +32,9 @@ fi
 KEY="${OPENROUTER_API_KEY:-}"
 REPOWISE_PROVIDER="${REPOWISE_PROVIDER:-openrouter}"
 REPOWISE_MODEL="${REPOWISE_MODEL:-deepseek/deepseek-v4-flash-0731}"
+# graft is DISABLED in benchmark.yaml (no C parser), so graft --deep is skipped
+# unless explicitly asked for (it costs LLM $ with no benchmark benefit today).
+BUILD_GRAFT_DEEP="${BUILD_GRAFT_DEEP:-0}"
 
 echo "[index bake] kernel=$(git describe --tags 2>/dev/null || git log -1 --oneline) dir=$KERNEL_DIR"
 
@@ -66,13 +69,17 @@ if [[ -n "$KEY" ]]; then
             || { echo "repowise generate $sub FAILED"; exit 1; }
     done
 
-    echo "=== graft --deep (FOCUSED, keyed) ==="
-    for sub in drivers/gpu/drm/i915 drivers/usb/typec; do
-        [ -d "$sub" ] || continue
-        echo "--- graft build --deep: $sub ---"
-        (cd "$sub" && graft build --deep . 2>&1 | tail -5) \
-            || { echo "graft --deep $sub FAILED"; exit 1; }
-    done
+    echo "=== graft --deep (FOCUSED, keyed, optional) ==="
+    if [[ "$BUILD_GRAFT_DEEP" = "1" ]]; then
+        for sub in drivers/gpu/drm/i915 drivers/usb/typec; do
+            [ -d "$sub" ] || continue
+            echo "--- graft build --deep: $sub ---"
+            (cd "$sub" && graft build --deep . 2>&1 | tail -5) \
+                || { echo "graft --deep $sub FAILED"; exit 1; }
+        done
+    else
+        echo "skipped (graft disabled; set BUILD_GRAFT_DEEP=1 to enable)"
+    fi
 
     # Defense-in-depth: the key is needed only to synthesize the index, never at
     # runtime (repowise search / graft query are offline). Scrub any env file

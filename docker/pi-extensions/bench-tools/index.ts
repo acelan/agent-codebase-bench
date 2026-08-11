@@ -25,12 +25,12 @@ interface RunResult {
   isError?: boolean;
 }
 
-function run(bin: string, args: string[]): Promise<RunResult> {
+function run(bin: string, args: string[], cwd: string = KERNEL_DIR): Promise<RunResult> {
   return new Promise((resolve) => {
     execFile(
       bin,
       args,
-      { cwd: KERNEL_DIR, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 },
+      { cwd: cwd, timeout: 300_000, maxBuffer: 64 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
           const msg = (stderr || stdout || err.message).trim() || String(err);
@@ -81,18 +81,25 @@ export default function (pi: ExtensionAPI) {
   });
 
   // --- repowise ------------------------------------------------------------
+  // repowise is baked per-subtree (.repowise lives in each indexed subtree,
+  // not the kernel root), so this tool runs repowise from the subtree that
+  // holds the relevant index. i915 is the default benchmark scope; pass a
+  // different relative subtree (e.g. drivers/usb/typec) for other code.
   pi.registerTool({
     name: "repowise",
     label: "Repowise",
     description:
-      "Search the repowise wiki / vector index of the codebase by keyword, " +
-      "meaning, or symbol name. Returns pages with file:line references. " +
-      "Use for any code-query question about the codebase.",
+      "Search the repowise wiki / vector index by keyword, meaning, or " +
+      "symbol name. The index is per-subtree; this searches the i915 subtree " +
+      "by default. Pass `path` for another subtree (e.g. drivers/usb/typec " +
+      "for typec code). Returns pages with file:line references.",
     parameters: Type.Object({
       query: Type.String({ description: "The keyword / meaning / symbol-name query, e.g. 'drm_dev_register' or 'i915_pm_suspend'" }),
+      path: Type.Optional(Type.String({ description: "Relative subtree holding the repowise index (default drivers/gpu/drm/i915)" })),
     }),
     async execute(_id, params) {
-      return run("repowise", ["search", params.query]);
+      const sub = (params.path || "drivers/gpu/drm/i915").replace(/^\/+/, "");
+      return run("repowise", ["search", params.query], `${KERNEL_DIR}/${sub}`);
     },
   });
 
