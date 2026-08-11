@@ -46,6 +46,7 @@ CANDIDATE_PATHS = {
     "graft": [None],
     "codebase-memory-mcp": [None],
     "rg": [None],
+    "pi": [os.path.expanduser("~/workspace/pi/pi/pi")],
 }
 
 
@@ -126,7 +127,17 @@ def _kernel_git_version():
 
 @lru_cache(maxsize=None)
 def tool_version(tool, backend="native"):
-    """Return (version_str, source). source in {'tool','kernel_git','n/a'}."""
+    """Return (version_str, source). source in {'tool','agent','kernel_git','n/a'}.
+
+    'grep' is the pi agent's built-in search tool (allowlist read,grep,find,ls),
+    not a standalone CLI, so its version is the PI AGENT version — not ripgrep's.
+    'ripgrep' is the raw rg binary and reports rg's own version.
+    """
+    if tool == "grep":
+        text = _probe_docker("pi") if backend == "docker" else _probe_host("pi")
+        v = _parse_version(text) if text else None
+        if v:
+            return v, "agent"
     bin = VERSION_BIN.get(tool, tool)
     text = _probe_docker(bin) if backend == "docker" else None
     if not text:
@@ -146,6 +157,12 @@ def tool_version(tool, backend="native"):
 
 def tool_version_meta(tool, backend="native"):
     """Human-friendly version info incl. the raw probe output fragment."""
+    if tool == "grep":
+        text = (_probe_docker("pi") if backend == "docker" else _probe_host("pi")) or ""
+        v, src = tool_version(tool, backend)
+        frag = (text.strip().splitlines() or [""])[0][:80]
+        return {"tool": tool, "bin": "pi", "version": v, "source": src,
+                "probe": frag}
     bin = VERSION_BIN.get(tool, tool)
     text = (_probe_docker(bin) if backend == "docker" else _probe_host(bin)) or ""
     v, src = tool_version(tool, backend)

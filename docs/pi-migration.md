@@ -101,7 +101,9 @@ report.md / report.html / versions.json              aggregates, one model root
   each individually findable.
 - Version = `tool --version` probe (`pi_versions.py`); if a tool reports none,
   the **kernel git HEAD short hash** is used (the final-commit identity of what
-  is actually measured).
+  is actually measured). The built-in `grep` tool is the pi agent's search tool
+  (not a CLI), so its version is the **pi agent version** (`grep@0.84.1`,
+  source `agent`) rather than ripgrep's; `ripgrep` reports rg's own version.
 - `pi_aggregate.py` loads all runs from `runs.json`, groups by
   (tool@version, prompt), and reports mean/median/min/max + n per metric
   (total, in, out, cache, reas, api, cost, wall, tool-calls).
