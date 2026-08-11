@@ -44,7 +44,10 @@ PROBE_EXT = "/opt/pi-bench/extensions/bench-tools/index.ts"
 # The pi -t allowlist for each benchmark tool (key = benchmark tool name).
 TOOL_SET = {
     "grep": "read,grep,find,ls",
-    "ripgrep": "read,write,edit,grep,find,ls,bash",
+    # ripgrep cell: raw `rg` via bash. `grep` is deliberately NOT allowlisted so
+    # the model cannot silently fall back to the built-in grep tool — it must
+    # run ripgrep itself, or the token/cost figures are contaminated.
+    "ripgrep": "read,write,edit,find,ls,bash",
     "codebase-memory-mcp": "codebase_memory",
     "codegraph": "codegraph",
     "graft": "graft",
