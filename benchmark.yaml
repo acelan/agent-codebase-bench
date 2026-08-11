@@ -29,6 +29,7 @@ tool_instruction:
   codegraph: "Use codegraph to do any code related query. "
   graft: "Use graft to do any code related query. "
   repowise: "Use repowise to do any code related query. "
+  rtk: "Use rtk to do any code related query; rtk compresses grep/ripgrep output to cut the tokens you read. "
 
 # Tool definitions. `index.run` is executed (cwd = kernel_dir) only when
 # --ensure-index is passed; it is never run implicitly, because a full kernel
@@ -76,6 +77,12 @@ tools:
       check: ["test", "-d", "{kernel_dir}/.repowise"]
       check_mode: rc
       run: ["repowise", "init", "{kernel_dir}"]
+  # rtk (Rust Token Killer): a standalone CLI wrapper that compresses grep/rg
+  # output. No persistent index — it wraps the on-disk tree at query time, so
+  # no index.check/run. The pi allowlist token is the custom extension tool name.
+  rtk:
+    enabled: true
+    toolsets: "rtk"
 
 # Prompt corpus. `id` names the result file; `text` is appended to the tool
 # instruction above to form the full -z query.
