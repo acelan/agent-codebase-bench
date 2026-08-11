@@ -64,7 +64,11 @@ tools:
       check_mode: rc
       run: ["codegraph", "index", "."]
   graft:
-    enabled: true
+    # DISABLED: graft's npm CLI ships no tree-sitter-c grammar (only Go/Python/
+    # TypeScript), so it cannot index the kernel's C code — every build returns
+    # 0 C cards and ask() returns unrelated Python matches. Re-enable when the
+    # C/C++ parser lands: https://github.com/NanoNets/Graft/pull/69
+    enabled: false
     toolsets: "graft"
     index:
       check: ["graft", "check", "{kernel_dir}"]

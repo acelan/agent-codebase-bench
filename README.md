@@ -21,7 +21,7 @@ unavailable to the model, so measurements aren't polluted by a ripgrep fallback)
 | `grep` | ripgrep-backed built-in search (`-t read,grep,find,ls`) |
 | `ripgrep` | raw `rg` via bash (`-t ... ,bash`) |
 | `codegraph` | code intelligence / knowledge-graph index |
-| `graft` | context graph (linked markdown) |
+| `graft` | context graph (linked markdown) — **disabled**: npm CLI has no C tree-sitter grammar, can't index the kernel; re-enable when [PR #69](https://github.com/NanoNets/Graft/pull/69) ships |
 | `repowise` | codebase wiki / semantic index |
 | `codebase-memory-mcp` | structural graph index |
 | `rtk` | Rust Token Killer — wraps grep/rg, compresses output the agent reads |

@@ -23,7 +23,7 @@ mechanisms the benchmark depends on were verified on the host binary:
 | benchmark tool | hermes toolset | pi `-t` allowlist |
 |---|---|---|
 | `grep` | `file` | `read,grep,find,ls` |
-| `ripgrep` | `file,terminal` | `read,write,edit,grep,find,ls,bash` |
+| `ripgrep` | `file,terminal` | `read,write,edit,find,ls,bash` (no `grep` — forces raw `rg` via bash, blocking fallback to the built-in grep tool) |
 | `codebase-memory-mcp` | `codebase-memory-mcp` (MCP) | `codebase_memory` (extension tool) |
 | `codegraph` | `codegraph` (MCP) | `codegraph` (extension tool) |
 | `graft` | `graft` (MCP) | `graft` (extension tool) |
@@ -72,9 +72,15 @@ benchmark.yaml                     tools (incl. rtk), prompts, tool_instruction
 ```
 
 Tools benchmarked (via the pi extension tool bridge): grep, ripgrep, codegraph,
-graft, repowise, codebase-memory-mcp, and **rtk** (Rust Token Killer — wraps
-grep/rg and compresses the output the agent reads, so it directly cuts token
-usage; `rtk grep <pattern> <path>`).
+repowise, codebase-memory-mcp, and **rtk** (Rust Token Killer — wraps grep/rg
+and compresses the output the agent reads, so it directly cuts token usage;
+`rtk grep <pattern> <path>`).
+
+**graft is disabled** (`benchmark.yaml` → `graft.enabled: false`): its npm CLI
+bundles no `tree-sitter-c` grammar (only Go/Python/TypeScript), so it cannot
+index the kernel's C code — builds return 0 C cards and `ask()` returns
+unrelated Python matches. Re-enable when the C/C++ parser lands via
+[NanoNets/Graft#69](https://github.com/NanoNets/Graft/pull/69).
 
 ## Versioned storage & averaging model
 
