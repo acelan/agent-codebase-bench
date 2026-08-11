@@ -142,12 +142,19 @@ python3 bench_pi.py --model openrouter/deepseek-v4-flash-0731 --aggregate-only
   pinned v7.0): codegraph `.codegraph` 4.6G, graft `graft/` 27M, and
   codebase-memory-mcp `~/.cache/codebase-memory-mcp/workspace-linux.db` 12.2G
   (`status: ready`, 8.06M nodes). Verified queryable in-container.
-  repowise / graft `--deep` remain NOT baked for the offline build: they are
-  LLM-synthesis tools, full-tree repowise `--mode standard` is a measured
-  ~16h then OOM/SIGKILL trap (see code-search-benchmark skill). To bake them
-  (focused to the benchmark's query scope only) pass
-  `--build-arg BUILD_OPENROUTER_API_KEY=$KEY`.
-- **Full matrix run** not yet executed; only the grep cell path is verified.
+- **Repowise (and graft `--deep`) bake requires an API key — via SECRET, not
+  ARG.** They are LLM-synthesis tools; full-tree repowise `--mode standard` is
+  a measured ~16h then OOM/SIGKILL trap, so they are baked FOCUSED to the
+  benchmark subtrees (`drivers/gpu/drm/i915`, `drivers/usb/typec` — repowise
+  scopes `.repowise/` to the subtree). The key is supplied as a docker build
+  secret (gitignored `docker/.env.repowise`, see the `.example`), consumed at
+  build time, and scrubbed from the image:
+  ```bash
+  cp docker/.env.repowise.example docker/.env.repowise   # fill OPENROUTER_API_KEY, REPOWISE_MODEL
+  docker build -t agent-codebase-bench -f docker/Dockerfile \
+      --secret id=repowise_env,src=docker/.env.repowise .
+  ```
+- **Full matrix run** not yet executed; only the grep/rtk cell paths verified.
 - The image pins linux v7.0 to match the prompt era (i915_drv.c exists there;
   on 7.2-era mainline it was restructured and `i915_drv.c` is gone).
 

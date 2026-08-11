@@ -65,12 +65,14 @@ RUN chmod +x /opt/pi-bench/prepare-index.sh
 
 # --- bake tool indexes at build time (kernel pinned v7.0 -> reproducible) -
 # BUILD_INDEXES=1 (default) builds the OFFLINE full indexes (codegraph, graft
-# wiring, codebase-memory-mcp; ~21GB, no key). Passing the key also bakes the
-# LLM-synthesis tools focused to the benchmark scope (repowise, graft --deep).
+# wiring, codebase-memory-mcp; ~21GB, no key). Repowise + graft --deep are
+# LLM-synthesis tools baked focused to the benchmark scope ONLY when an
+# OPENROUTER_API_KEY is provided via a BUILD SECRET (docker/.env.repowise),
+# never a build-arg — so the key cannot leak into image history.
 # Keep THIS step's inputs (above) stable so it stays cached across tool adds.
 ARG BUILD_INDEXES=1
-ARG BUILD_OPENROUTER_API_KEY=""
-RUN if [ "${BUILD_INDEXES}" = "1" ]; then \
+RUN --mount=type=secret,id=repowise_env,required=false \
+    if [ "${BUILD_INDEXES}" = "1" ]; then \
         /opt/pi-bench/prepare-index.sh; \
     fi
 

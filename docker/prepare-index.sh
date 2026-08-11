@@ -13,13 +13,25 @@
 #
 # Env:
 #   KERNEL_DIR      (default /workspace/linux)
-#   BUILD_OPENROUTER_API_KEY   set to bake repowise + graft --deep (needs $)
-# Exit 0 always logs; nonzero fails the image build (intended).
+#   Secret /run/secrets/repowise_env (docker build-secret, optional) carrying:
+#     OPENROUTER_API_KEY   pays for repowise/graft --deep synthesis (needs $)
+#     REPOWISE_MODEL       model id for page synthesis (default to a cheap one)
+#   The key is consumed at build time only and scrubbed from the image.
 set -euo pipefail
 
 KERNEL_DIR="${KERNEL_DIR:-/workspace/linux}"
-KEY="${BUILD_OPENROUTER_API_KEY:-}"
 cd "$KERNEL_DIR"
+
+# Load optional build-secret (never an ARG, so it doesn't leak into the image).
+if [ -f /run/secrets/repowise_env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . /run/secrets/repowise_env
+    set +a
+fi
+KEY="${OPENROUTER_API_KEY:-}"
+REPOWISE_PROVIDER="${REPOWISE_PROVIDER:-openrouter}"
+REPOWISE_MODEL="${REPOWISE_MODEL:-deepseek/deepseek-v4-flash-0731}"
 
 echo "[index bake] kernel=$(git describe --tags 2>/dev/null || git log -1 --oneline) dir=$KERNEL_DIR"
 
@@ -38,8 +50,12 @@ codebase-memory-mcp cli index_repository --repo-path "$KERNEL_DIR" 2>&1 | tail -
     || { echo "codebase-memory index FAILED"; exit 1; }
 
 if [[ -n "$KEY" ]]; then
-    export OPENROUTER_API_KEY="$KEY"
+    export OPENROUTER_API_KEY REPOWISE_PROVIDER REPOWISE_MODEL
     echo "=== repowise (FOCUSED standard, keyed) ==="
+    # repowise scopes to cwd/. (verified: .repowise lands in the subtree), so
+    # cd'ing into each benchmark subtree builds a subtree-local index without
+    # walking the whole kernel (which OOMs). init --no-prose scaffolds the
+    # structural pages (no LLM), then generate synthesizes concept-page prose.
     for sub in drivers/gpu/drm/i915 drivers/usb/typec; do
         [ -d "$sub" ] || continue
         echo "--- repowise init --no-prose --mode standard: $sub ---"
@@ -57,8 +73,14 @@ if [[ -n "$KEY" ]]; then
         (cd "$sub" && graft build --deep . 2>&1 | tail -5) \
             || { echo "graft --deep $sub FAILED"; exit 1; }
     done
+
+    # Defense-in-depth: the key is needed only to synthesize the index, never at
+    # runtime (repowise search / graft query are offline). Scrub any env file
+    # repowise may have written so the secrets are NOT baked into the image.
+    echo "=== scrubbing key-bearing env files from the baked index ==="
+    find "$KERNEL_DIR" -path '*/.repowise/.env' -delete 2>/dev/null || true
 else
-    echo "=== repowise / graft --deep SKIPPED (no BUILD_OPENROUTER_API_KEY) ==="
+    echo "=== repowise / graft --deep SKIPPED (no OPENROUTER_API_KEY secret) ==="
 fi
 
 echo "[index bake] done"
