@@ -41,6 +41,10 @@ PI_MODEL_FLAG = "--model"                          # pi uses --model provider/mo
 # relies on the image entrypoint to add the extension.
 PROBE_EXT = "/opt/pi-bench/extensions/bench-tools/index.ts"
 
+# Per-cell runtime limit (seconds); override with PI_CELL_TIMEOUT. Default 1800s
+# (30 min) may be too short for the deep typec root-cause cells.
+CELL_TIMEOUT = int(os.environ.get("PI_CELL_TIMEOUT", "1800"))
+
 # The pi -t allowlist for each benchmark tool (key = benchmark tool name).
 TOOL_SET = {
     "grep": "read,grep,find,ls",
@@ -110,7 +114,8 @@ def run_cell(cfg, tool, prompt, tool_version, version_source, run_ts,
 
     t0 = time.monotonic()
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=CELL_TIMEOUT)
     except subprocess.TimeoutExpired:
         r = None
     wall = time.monotonic() - t0
