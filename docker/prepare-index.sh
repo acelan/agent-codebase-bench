@@ -14,8 +14,13 @@
 # Env:
 #   KERNEL_DIR      (default /workspace/linux)
 #   Secret /run/secrets/repowise_env (docker build-secret, optional) carrying:
-#     OPENROUTER_API_KEY   pays for repowise/graft --deep synthesis (needs $)
-#     REPOWISE_MODEL       model id for page synthesis (default to a cheap one)
+#     OPENROUTER_API_KEY        pays repowise/graft --deep synthesis + embeddings
+#     REPOWISE_PROVIDER         LLM provider (default openrouter)
+#     REPOWISE_MODEL            model id for page synthesis (default a cheap one)
+#     REPOWISE_EMBEDDER         vector embedder (default openrouter -> real dims)
+#     REPOWISE_EMBEDDING_MODEL  embedding model on that provider (default
+#                               openai/text-embedding-3-small)
+#     REPOWISE_EMBEDDING_DIMS   / REPOWISE_EMBEDDING_TIMEOUT (optional)
 #   The key is consumed at build time only and scrubbed from the image.
 set -euo pipefail
 
@@ -31,7 +36,19 @@ if [ -f /run/secrets/repowise_env ]; then
 fi
 KEY="${OPENROUTER_API_KEY:-}"
 REPOWISE_PROVIDER="${REPOWISE_PROVIDER:-openrouter}"
-REPOWISE_MODEL="${REPOWISE_MODEL:-deepseek/deepseek-v4-flash-0731}"
+# Default the repowise synthesis model to the pi-agent model (PI_MODEL from
+# docker/.env) when the single-model .env is in use; else a cheap fallback.
+REPOWISE_MODEL="${REPOWISE_MODEL:-${PI_MODEL:-deepseek/deepseek-v4-flash-0731}}"
+# Embedder (semantic-search vectors; SEPARATE from the LLM provider above).
+# openrouter gives the baked vector store REAL embeddings via the same key;
+# leaving it unset defaults repowise to `mock` (dummy, non-semantic) vectors.
+# The embedding model must be one OpenRouter actually serves (e.g.
+# openai/text-embedding-3-small). DIMS/TIMEOUT are optional; unset lets
+# repowise infer dims from the model and use its default timeout.
+REPOWISE_EMBEDDER="${REPOWISE_EMBEDDER:-openrouter}"
+REPOWISE_EMBEDDING_MODEL="${REPOWISE_EMBEDDING_MODEL:-openai/text-embedding-3-small}"
+REPOWISE_EMBEDDING_DIMS="${REPOWISE_EMBEDDING_DIMS:-}"
+REPOWISE_EMBEDDING_TIMEOUT="${REPOWISE_EMBEDDING_TIMEOUT:-}"
 # graft is DISABLED in benchmark.yaml (no C parser), so graft --deep is skipped
 # unless explicitly asked for (it costs LLM $ with no benchmark benefit today).
 BUILD_GRAFT_DEEP="${BUILD_GRAFT_DEEP:-0}"
@@ -53,7 +70,9 @@ codebase-memory-mcp cli index_repository --repo-path "$KERNEL_DIR" 2>&1 | tail -
     || { echo "codebase-memory index FAILED"; exit 1; }
 
 if [[ -n "$KEY" ]]; then
-    export OPENROUTER_API_KEY REPOWISE_PROVIDER REPOWISE_MODEL
+    export OPENROUTER_API_KEY REPOWISE_PROVIDER REPOWISE_MODEL \
+        REPOWISE_EMBEDDER REPOWISE_EMBEDDING_MODEL \
+        REPOWISE_EMBEDDING_DIMS REPOWISE_EMBEDDING_TIMEOUT
     echo "=== repowise (FOCUSED standard, keyed) ==="
     # repowise scopes to cwd/. (verified: .repowise lands in the subtree), so
     # cd'ing into each benchmark subtree builds a subtree-local index without

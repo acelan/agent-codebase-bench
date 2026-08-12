@@ -146,15 +146,31 @@ python3 bench_pi.py --model openrouter/deepseek-v4-flash-0731 --aggregate-only
   ARG.** They are LLM-synthesis tools; full-tree repowise `--mode standard` is
   a measured ~16h then OOM/SIGKILL trap, so they are baked FOCUSED to the
   benchmark subtrees (`drivers/gpu/drm/i915`, `drivers/usb/typec` — repowise
-  scopes `.repowise/` to the subtree). The key is supplied as a docker build
-  secret (gitignored `docker/.env.repowise`, see the `.example`), consumed at
-  build time, and scrubbed from the image:
+  scopes `.repowise/` to the subtree). Key + models live in one gitignored
+  `docker/.env` (see `docker/.env.example`), consumed at build time and
+  scrubbed from the image:
   ```bash
-  cp docker/.env.repowise.example docker/.env.repowise   # fill OPENROUTER_API_KEY, REPOWISE_MODEL
+  cp docker/.env.example docker/.env        # fill OPENROUTER_API_KEY, PI_MODEL, ...
   docker build -t agent-codebase-bench -f docker/Dockerfile \
-      --secret id=repowise_env,src=docker/.env.repowise .
+      --secret id=repowise_env,src=docker/.env .
   ```
-- **Full matrix run** not yet executed; only the grep/rtk cell paths verified.
+- **Repowise semantic (vector) search is currently FULL-TEXT-ONLY.** The baked
+  vector/embedding index fails to build: `repowise generate` reports
+  `Indexed 0 items (N failed)` per subtree. `prepare-index.sh` already exports
+  `REPOWISE_EMBEDDER=openrouter` +
+  `REPOWISE_EMBEDDING_MODEL=openai/text-embedding-3-small`, yet the vectors
+  still fail — strong evidence **repowise 0.41 reads the embedder from
+  `.repowise/config.yaml` (the subtree), not process env**, so the env vars are
+  ignored during the bake. Until fixed, `repowise search` works on the wiki
+  pages (full-text) but not semantically. Fix = set `provider: openrouter` /
+  `model: openai/text-embedding-3-small` under an embedding/embedder key in the
+  subtree's `.repowise/config.yaml` and confirm OpenRouter actually serves that
+  embedding model, then re-bake.
+- **Full matrix run** DONE (`deepseek-v4-flash-0731`, 6 tools × 3 prompts,
+  18/18 cells after filling 2 timeouts) → `artifacts/report.html`. Two tips:
+  deep typec/trace cells can exceed 1800s and time out — raise per-cell via
+  `PI_CELL_TIMEOUT`; codebase-memory-mcp@0.10.2 OOM-kills its index worker on
+  the full kernel so codebase-memory stays pinned at 0.9.0.
 - The image pins linux v7.0 to match the prompt era (i915_drv.c exists there;
   on 7.2-era mainline it was restructured and `i915_drv.c` is gone).
 

@@ -38,8 +38,8 @@ indexes. Key properties:
 - **Indexes baked at build** (`ARG BUILD_INDEXES=1`, `docker/prepare-index.sh`)
   since the kernel is pinned — reproducible, no per-cell re-index. Offline full
   indexes: codegraph, graft-wiring, codebase-memory-mcp (~21GB). The LLM-synthesis
-  tools (repowise, graft `--deep`) are gated behind
-  `--build-arg BUILD_OPENROUTER_API_KEY=$KEY` and scoped to the benchmark subtrees
+  tools (repowise, graft `--deep`) are gated behind an `OPENROUTER_API_KEY` **build
+  SECRET** (`docker/.env`) and scoped to the benchmark subtrees
   (full-tree parametrization is a measured OOM trap — see the skill).
 - **Cheap tool iteration:** everything that changes often (extension/harness/rtk)
   is layered *after* the index bake, so adding a tool reuses cached index layers.
@@ -67,8 +67,13 @@ report.md / report.html / versions.json              aggregates at the model roo
 ## Run it
 
 ```bash
+# one source of truth for key + models (gitignored; copy from docker/.env.example)
+set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, REPOWISE_*
+
 # build the image (bakes indexes; ~1h, ~21GB — move to /tmp if using BUILD_INDEXES=1)
-docker build -t agent-codebase-bench -f docker/Dockerfile .
+# --secret feeds repowise/graft --deep bake so they run keyed on the subtrees
+docker build -t agent-codebase-bench -f docker/Dockerfile \
+  --secret id=repowise_env,src=docker/.env .
 
 # recommended: run the harness in-image; the ONLY host mount is artifacts/
 docker run --rm -it \
@@ -76,13 +81,13 @@ docker run --rm -it \
   -v "$(pwd)/artifacts:/workspace/artifacts" \
   --entrypoint /usr/local/bin/pi-bench-run \
   agent-codebase-bench \
-  --model openrouter/deepseek-v4-flash-0731 --backend native --runs 2
+  --model "$PI_MODEL" --backend native --runs 2
 
 # host-driven, one-shot containers per cell
-python3 bench_pi.py --model openrouter/deepseek-v4-flash-0731 --backend docker --runs 2
+python3 bench_pi.py --model "$PI_MODEL" --backend docker --runs 2
 
 # recompute averages/reports from already-saved runs only
-python3 bench_pi.py --model openrouter/deepseek-v4-flash-0731 --aggregate-only
+python3 bench_pi.py --model "$PI_MODEL" --aggregate-only
 
 # subset / repeat
 python3 bench_pi.py --model ... --tools grep,rtk --prompts callers-drm-register --runs 3
