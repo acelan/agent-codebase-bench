@@ -40,12 +40,14 @@ RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
 # --- benchmark tools (index-backed), pinned -------------------------------
 # codegraph (npm), graft (npm), codebase-memory-mcp (npm: static binary),
 # repowise (PyPI -> venv; not on root PATH, invoke via its venv bin).
+# codebase-memory-mcp@latest (0.10.2) OOM-kills its index worker (signal 9) on
+# the full v7.0 kernel index; pin 0.9.0, the known-good version for it.
 RUN npm install -g \
       @colbymchenry/codegraph@1.5.0 \
       @nanonets/graft@0.9.0 \
       codebase-memory-mcp@0.9.0
 RUN python3 -m venv /opt/repowise-venv \
- && /opt/repowise-venv/bin/pip install --no-cache-dir 'repowise==0.39.0' \
+ && /opt/repowise-venv/bin/pip install --no-cache-dir 'repowise==0.41.0' \
  && ln -s /opt/repowise-venv/bin/repowise /usr/local/bin/repowise
 
 # --- clone the Linux kernel at build time (self-contained image) ----------
@@ -84,7 +86,7 @@ RUN --mount=type=secret,id=repowise_env,required=false \
 # --- rtk (Rust Token Killer), pinned to a release binary -------------------
 # Single static musl binary: wraps bash output (rtk grep / rtk read / rtk rg)
 # to cut the tokens the agent reads. Its version is part of the tool id.
-ARG RTK_VERSION=0.42.4
+ARG RTK_VERSION=0.45.0
 RUN set -eux; \
     curl -fsSL -o /tmp/rtk.tgz \
       "https://github.com/rtk-ai/rtk/releases/download/v${RTK_VERSION}/rtk-x86_64-unknown-linux-musl.tar.gz"; \

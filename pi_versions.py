@@ -46,7 +46,8 @@ CANDIDATE_PATHS = {
     "graft": [None],
     "codebase-memory-mcp": [None],
     "rg": [None],
-    "pi": [os.path.expanduser("~/workspace/pi/pi/pi")],
+    # pi is resolved from PATH (the docker image installs @earendil-works/pi-coding-agent).
+    "pi": [None],
 }
 
 
