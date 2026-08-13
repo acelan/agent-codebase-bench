@@ -51,6 +51,7 @@ artifacts/<model>-<provider>/<tool>@<version>/
   runs.json                                          append-only list of runs
   summary.json                                       per-prompt averages
 report.md / report.html / versions.json              aggregates at the model root
+artifacts/result-summary.json                        cached LLM report analysis at the artifact root
 ```
 
 - Every run is timestamped, so the same `tool@version` can be benchmarked many
@@ -59,12 +60,20 @@ report.md / report.html / versions.json              aggregates at the model roo
   hash when the tool reports none.
 - `pi_aggregate.py` averages across all runs (mean/median/min/max + n) per metric
   (total/in/out/cache/reasoning/api/cost/wall/tool-calls).
+- `artifacts/result-summary.json` caches the LLM analysis used by the HTML
+  Result summary. Its fingerprint covers the normalized metrics and transcripts,
+  analyst model, prompt/schema version, and compaction settings. Report generation
+  reuses a matching cache without calling the analyst; changed inputs regenerate it.
+- Set `PI_SUMMARY_MODEL` to choose the report analyst. If omitted, it falls back
+  to the benchmark `PI_MODEL`. The analyst runs once per testcase so recorded
+  iteration traces stay within its context window. Analyst token usage is
+  report-generation overhead and is excluded from benchmark totals and tables.
 
 ## Run it
 
 ```bash
 # one source of truth for key + models (gitignored; copy from docker/.env.example)
-set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, REPOWISE_*
+set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, optional PI_SUMMARY_MODEL, REPOWISE_*
 
 # build the single image (does not build indexes)
 docker build -t agent-codebase-bench -f docker/Dockerfile .
@@ -78,7 +87,7 @@ docker run --rm -it \
 
 # recommended: run the harness in-image; the ONLY host mount is artifacts/
 docker run --rm -it \
-  -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY \
+  --env-file docker/.env \
   -v "$(pwd)/artifacts:/workspace/artifacts" \
   --entrypoint /usr/local/bin/pi-bench-run \
   agent-codebase-bench \
@@ -90,9 +99,18 @@ python3 bench_pi.py --model "$PI_MODEL" --backend docker --runs 2
 # recompute averages/reports from already-saved runs only
 python3 bench_pi.py --model "$PI_MODEL" --aggregate-only
 
+# render directly; bypass a matching analysis cache and regenerate it
+python3 pi_report.py --artifacts artifacts --out artifacts/report.html --force-summary
+
 # subset / repeat
 python3 bench_pi.py --model ... --tools grep,rtk --prompts callers-drm-register --runs 3
 ```
+
+Both normal aggregation and direct `pi_report.py` rendering create or reuse the
+fingerprinted analysis cache automatically. A cache hit needs no provider call or
+credentials. If analysis fails and no valid matching cache can be generated, the
+report explicitly shows **LLM analysis unavailable**, while its benchmark tables
+and recorded iterations still render; the failure reason is written to stderr.
 
 ## Layout
 

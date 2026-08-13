@@ -126,7 +126,9 @@ def main():
     # Combined report at the artifacts root, spanning all model runs.
     import pi_report
     out = pi_report.render(base_dir, os.path.join(base_dir, "report.html"),
-                           cfg.get("tool_instruction") or {})
+                           cfg.get("tool_instruction") or {},
+                           analyst_model=(os.environ.get("PI_SUMMARY_MODEL")
+                                          or cfg["model"]))
     print(f"combined report: {out}")
     sys.exit(0)
 

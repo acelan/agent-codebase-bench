@@ -106,7 +106,7 @@ RUN chmod +x /usr/local/bin/pi-bench
 # Drives pi in --mode json natively (pi on PATH) and writes every run + html
 # report under ./artifacts -> the host mount.
 COPY pi_stream.py pi_transcript.py pi_runner.py pi_versions.py pi_aggregate.py \
-     pi_report.py bench_pi.py benchmark.yaml \
+     pi_summary.py pi_report.py bench_pi.py benchmark.yaml \
      /opt/pi-bench/
 COPY docker/run-bench.sh /usr/local/bin/pi-bench-run
 RUN chmod +x /usr/local/bin/pi-bench-run \

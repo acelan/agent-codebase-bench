@@ -27,8 +27,9 @@ import argparse
 import html
 import json
 import os
-import re
+import sys
 
+import pi_summary
 
 # Metric columns shown per testcase: (summary key, human label, numeric).
 # wall_s / tcaps are renamed to friendly terms (req 6).
@@ -138,13 +139,25 @@ def load_cells(artifacts, instructions=None):
                 }
 
 
+def _artifact_file(model_root, tid, filename):
+    """Resolve an artifact filename without allowing absolute/parent escapes."""
+    base = os.path.realpath(os.path.join(model_root, tid))
+    candidate = os.path.realpath(os.path.join(base, str(filename)))
+    try:
+        if os.path.commonpath((base, candidate)) != base:
+            return None
+    except ValueError:
+        return None
+    return candidate
+
+
 def _prompt_text(model_root, tid, p, instructions=None):
     """Best-effort prompt text, with the prepended tool-instruction removed so
     the report shows the generic benchmark prompt (see docs/pi-migration.md)."""
     rl = p.get("run_log") or []
     tpath = ""
     if rl and rl[0].get("transcript"):
-        tpath = os.path.join(model_root, tid, rl[0]["transcript"])
+        tpath = _artifact_file(model_root, tid, rl[0]["transcript"]) or ""
     try:
         with open(tpath, encoding="utf-8") as f:
             tr = json.load(f)
@@ -179,7 +192,9 @@ def load_iterations(model_root, tid, p):
     rl = p.get("run_log") or []
     if not rl or not rl[0].get("transcript"):
         return None
-    tpath = os.path.join(model_root, tid, rl[0]["transcript"])
+    tpath = _artifact_file(model_root, tid, rl[0]["transcript"])
+    if tpath is None:
+        return None
     try:
         with open(tpath, encoding="utf-8") as f:
             trace = json.load(f)
@@ -265,122 +280,27 @@ def _tool_intro_html(rows):
             "<ul class='tools'>" + "".join(items) + "</ul>")
 
 
-def _trace_evidence(row):
-    """Extract workflow evidence from the recorded iterations, not usage data."""
-    iters = load_iterations(row["model_root"], row["tool_id"], row["pprompt"]) or []
-    calls = []
-    results = []
-    for iteration in iters:
-        for call in iteration.get("calls", []):
-            args = call.get("arguments")
-            if isinstance(args, dict):
-                args = json.dumps(args, ensure_ascii=False)
-            calls.append(f"{call.get('name', '')} {args or ''}")
-        results.extend((r.get("content") or "") for r in iteration.get("results", []))
-    call_text = "\n".join(calls)
-    result_text = "\n".join(results)
-    command_errors = any(re.search(
-        r"(?:\[.*? error\]|path not found:|/usr/bin/grep:|no such file|"
-        r"command failed|invalid (?:argument|query)|missing required)",
-        result, re.I) for result in results)
-    search_calls = [c for c in calls if re.search(r"\b(rg|grep|find|search|query)\b", c, re.I)]
-    return {
-        "calls": calls,
-        "searches": len(search_calls),
-        "reads": sum(bool(re.search(r"\b(read|sed|awk|cat|get_code_snippet|snippet)\b", c, re.I)) for c in calls),
-        "broad_discovery": bool(re.search(r"find /|cd /workspace && ls|ls drivers", call_text)),
-        "repeated_search": len(search_calls) >= 3,
-        "failures": command_errors,
-        "empty_results": any(not result.strip() or result.strip() == "(no output)" for result in results),
-        "large_results": any(len(r) > 5000 for r in results),
-        "graph_results": bool(re.search(
-            r"Found .* symbols|Blast radius|Dynamic-dispatch links|callers_total|"
-            r"relationship|\"rows\"\s*:", result_text, re.I)),
-        "fulltext_results": "Full-text search:" in result_text,
-        "api_setup": bool(re.search(
-            r"schema|project|pagination|search_code|get_code_snippet|query shape|"
-            r"mem\.init|version_cohort", call_text + "\n" + result_text, re.I)),
-        "result_text": result_text,
-    }
-
-
-def _workflow_summary(row):
-    """Explain where a tool saves/spends context based on its actual trace."""
-    tool = row["tool"]
-    evidence = _trace_evidence(row)
-    saves = []
-    spends = []
-    if tool == "rtk":
-        saves.append("compressing grep/rg-style results before they reach the agent")
-        spends.append("re-running searches when compressed output is insufficient")
-    elif tool == "codegraph":
-        saves.append("using compact indexed relationship exploration instead of reconstructing every edge with literal searches")
-        spends.append("interpreting broad blast-radius and source-excerpt responses and filtering irrelevant global matches")
-    elif tool == "codebase-memory-mcp":
-        saves.append("using indexed snippets and relationship queries once the project and query shape are understood")
-        spends.append("learning the API/schema and assembling the requested path from snippets, rows, and graph results")
-    elif tool == "repowise":
-        saves.append("avoiding a raw tree-wide source dump through indexed full-text retrieval")
-        spends.append("comparing ranked full-text snippets and filling structural gaps the search index does not answer")
-    elif tool == "graft":
-        saves.append("following pre-built context links instead of repeating unrelated source searches")
-        spends.append("following links that do not directly resolve the requested code relationship")
-    else:
-        saves.append("using literal matches to anchor the investigation in exact source locations")
-        spends.append("searching candidate names and reading surrounding definitions and callers")
-    if evidence["broad_discovery"]:
-        spends.append("initial filesystem or workspace discovery before the real query")
-    if evidence["repeated_search"] and tool not in ("repowise", "codebase-memory-mcp"):
-        spends.append("repeating or refining searches after the first result was incomplete")
-    if evidence["graph_results"]:
-        saves.append("getting symbol relationships and relevant source excerpts in the same lookup")
-        spends.append("the graph response carrying broad relationship and source context")
-    if evidence["fulltext_results"]:
-        spends.append("ranked full-text results that must be compared and verified")
-    if evidence["api_setup"] and tool == "codebase-memory-mcp":
-        spends.append("project/schema setup, malformed query retries, and pagination before useful results arrive")
-    if evidence["failures"]:
-        spends.append("recovering from empty, missing, or invalid tool results")
-    elif evidence["empty_results"]:
-        spends.append("checking empty search results before switching to a better-scoped query")
-    if evidence["large_results"]:
-        spends.append("large returned source or graph context that then remains in the conversation")
-    if evidence["reads"] and evidence["searches"] and tool not in ("codegraph", "codebase-memory-mcp"):
-        saves.append("moving from candidate matches to focused source windows rather than rereading unrelated files")
-    return (f"Saves context by {_join_phrases(saves)}. "
-            f"Spends context on {_join_phrases(spends)}.")
-
-
-def _join_phrases(items):
-    items = list(dict.fromkeys(items))
-    if len(items) == 1:
-        return items[0]
-    if len(items) == 2:
-        return f"{items[0]} and {items[1]}"
-    return "; ".join(items[:-1]) + f"; and {items[-1]}"
-
-
-def _results_summary_html(rows):
-    """Summarize strengths and costs from the recorded interaction traces."""
-    prompts = sorted({r["prompt"] for r in rows})
-    sections = ["<details class='result-summary'><summary>Result summary</summary>"
-                "<h1>Result summary</h1>",
-                "<p>These observations come from the recorded interaction traces. "
-                "They describe the workflow choices that save context and the "
-                "follow-up work that spends it, rather than repeating metric values.</p>"]
-    for prompt in prompts:
-        group = [r for r in rows if r["prompt"] == prompt]
-        valid = [r for r in group if r["cells"].get("total") is not None]
-        if not valid:
-            continue
-        winner = min(valid, key=lambda r: r["cells"]["total"])
-        sentences = [f"<b>{_esc(prompt)}</b>: <b>{_esc(winner['tool'])}</b> "
-                     f"has the most economical observed workflow. {_esc(_workflow_summary(winner))}"]
-        for row in sorted(valid, key=lambda r: r["tool"]):
-            if row is winner:
-                continue
-            sentences.append(f"<br><b>{_esc(row['tool'])}</b>: {_esc(_workflow_summary(row))}")
-        sections.append("<p class='finding'>" + " ".join(sentences) + "</p>")
+def _results_summary_html(findings, unavailable=None):
+    """Render validated LLM findings; analyst text is always escaped."""
+    sections = [
+        ("<details class='result-summary'><summary>Result summary</summary>"
+         "<h1>Result summary</h1>"),
+        ("<p>These observations were generated by an LLM from the recorded "
+         "per-iteration tool calls and results. Tables remain the numeric source of truth.</p>"),
+    ]
+    if unavailable:
+        sections.append(
+            "<p class='finding unavailable'><b>LLM analysis unavailable.</b> "
+            "See report-generation stderr for diagnostics.</p>"
+        )
+    for finding in findings or []:
+        body = [
+            (f"<b>{_esc(finding['testcase'])}</b>: <b>{_esc(finding['winner'])}</b> "
+             f"was the most economical observed workflow. {_esc(finding['why_winner'])}")
+        ]
+        for cost in finding.get("workflow_costs") or []:
+            body.append(f"<br><b>{_esc(cost['workflow'])}</b>: {_esc(cost['explanation'])}")
+        sections.append("<p class='finding'>" + " ".join(body) + "</p>")
     sections.append("</details>")
     return "".join(sections)
 
@@ -544,19 +464,43 @@ def _load_instructions(config=None):
         return {}
 
 
-def render(artifacts, out_path, instructions=None):
+def render(
+    artifacts,
+    out_path,
+    instructions=None,
+    *,
+    analyst_model=None,
+    force_summary=False,
+    analyst_runner=None,
+):
     if instructions is None:
         instructions = _load_instructions()
     rows = list(load_cells(artifacts, instructions))
     if not rows:
         raise SystemExit(f"no benchmark runs found under {artifacts}")
+    cache_path = os.path.join(artifacts, "result-summary.json")
+    findings = []
+    unavailable = None
+    try:
+        evidence = pi_summary.normalize_evidence(rows)
+        analysis = pi_summary.ensure_summary(
+            evidence,
+            cache_path,
+            analyst_model=analyst_model,
+            force=force_summary,
+            runner=analyst_runner,
+        )
+        findings = analysis["findings"]
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        unavailable = pi_summary.redact_secrets(str(exc))
+        print(f"LLM result-summary analysis unavailable: {unavailable}", file=sys.stderr)
     sections = [_overview_html(rows), _tool_intro_html(rows),
-                _results_summary_html(rows)]
+                _results_summary_html(findings, unavailable)]
     prompts = sorted({r["prompt"] for r in rows})
     for prompt in prompts:
         sections.append(_group_html(prompt, [r for r in rows if r["prompt"] == prompt]))
     with open(out_path, "w", encoding="utf-8") as f:
-        f.write(_page(f"agent-codebase-bench — aggregated report", "".join(sections)))
+        f.write(_page("agent-codebase-bench — aggregated report", "".join(sections)))
     return out_path
 
 
@@ -566,8 +510,15 @@ def main():
     ap.add_argument("--out", default="artifacts/report.html")
     ap.add_argument("--config", default=None,
                     help="benchmark.yaml (for tool_instruction prompt stripping)")
+    ap.add_argument("--force-summary", action="store_true",
+                    help="ignore a matching result-summary cache and rerun the analyst")
     args = ap.parse_args()
-    out = render(args.artifacts, args.out, _load_instructions(args.config))
+    out = render(
+        args.artifacts,
+        args.out,
+        _load_instructions(args.config),
+        force_summary=args.force_summary,
+    )
     print(f"Wrote {out} from {len(discover_model_roots(args.artifacts))} model run(s) "
           f"({os.path.basename(os.path.dirname(out))})")
 

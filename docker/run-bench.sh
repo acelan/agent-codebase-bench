@@ -14,7 +14,19 @@
 #     --model openrouter/deepseek-v4-flash-0731 --backend native [extra args...]
 set -euo pipefail
 
-: "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}"
+# A matching aggregate-only summary cache needs no provider credentials. Normal
+# benchmark runs still fail early with a clear diagnostic rather than starting
+# a matrix that cannot contact the configured model.
+aggregate_only=false
+for arg in "$@"; do
+    if [[ "$arg" == "--aggregate-only" ]]; then
+        aggregate_only=true
+        break
+    fi
+done
+if [[ "$aggregate_only" != true ]]; then
+    : "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}"
+fi
 export KERNEL_DIR=/workspace/linux
 export PI_BIN=pi
 
