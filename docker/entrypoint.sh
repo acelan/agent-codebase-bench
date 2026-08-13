@@ -10,6 +10,9 @@ set -euo pipefail
 KERNEL_DIR="${KERNEL_DIR:-/workspace/linux}"
 cd "$KERNEL_DIR"
 
+# Attach externally persisted indexes when the artifacts mount is present.
+/usr/local/bin/pi-bench-index link
+
 EXT="/opt/pi-bench/extensions/bench-tools/index.ts"
 if [[ -n "${PI_NO_EXT:-}" ]]; then
     exec pi "$@"

@@ -1,9 +1,8 @@
 # pi-agent migration for agent-codebase-bench
 
-Status: **PARTIAL / working** — docker image builds, pi runs headless in the
-container, and the JSON stream parses to the same trace + usage contract the
-hermes driver produced. Remaining: full matrix run + index persistence for the
-four index-backed tools.
+Status: **working** — docker image builds, pi runs headless in the container,
+the JSON stream parses to the same trace + usage contract the hermes driver
+produced, and indexes persist outside the image under `artifacts/indexes/`.
 
 ## Why this is viable (validated 2026-08-11)
 
@@ -55,10 +54,11 @@ pi streams one JSON object per line. Verified fields:
 
 ```
 docker/Dockerfile                  node:24-bookworm-slim + pi 0.84.1 + all tools
-                                   + linux v7.0 clone + baked indexes + rtk
+                                   + linux v7.0 clone + rtk (no indexes)
 docker/entrypoint.sh               adds --extension bench-tools, cd KERNEL_DIR
 docker/run-bench.sh                run harness in-image; all outputs to mounted artifacts/
-docker/prepare-index.sh            build tool indexes at image build time
+docker/index-cache.sh              attach/build external indexes
+docker/prepare-index.sh            build missing indexes into artifacts/indexes/
 docker/pi-extensions/bench-tools/index.ts   the tool bridge (TS)
 pi_stream.py                       NDJSON loader + content flattening
 pi_transcript.py                   stream -> trace dict (drop-in for transcript.py)
@@ -116,6 +116,12 @@ report.md / report.html / versions.json              aggregates, one model root
 # build the image (installs pi + tools, clone linux @ v7.0, harness venv)
 docker build -t agent-codebase-bench -f docker/Dockerfile .
 
+# build missing indexes once; subsequent calls reuse complete index markers
+docker run --rm -it --env-file docker/.env \
+    -v "$(pwd)/artifacts:/workspace/artifacts" \
+    --entrypoint /usr/local/bin/pi-bench-index \
+    agent-codebase-bench build
+
 # A) recommended: run the harness IN the image; the ONLY host mount is artifacts/
 docker run --rm -it \
   -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY \
@@ -137,40 +143,42 @@ python3 bench_pi.py --model openrouter/deepseek-v4-flash-0731 --aggregate-only
 
 ## TODO / known gaps
 
-- **Index baking — DONE (offline set).** `docker/prepare-index.sh` (run via
-  `ARG BUILD_INDEXES=1`) bakes reproducible full indexes at build time (kernel
-  pinned v7.0): codegraph `.codegraph` 4.6G, graft `graft/` 27M, and
-  codebase-memory-mcp `~/.cache/codebase-memory-mcp/workspace-linux.db` 12.2G
-  (`status: ready`, 8.06M nodes). Verified queryable in-container.
-- **Repowise (and graft `--deep`) bake requires an API key — via SECRET, not
-  ARG.** They are LLM-synthesis tools; full-tree repowise `--mode standard` is
-  a measured ~16h then OOM/SIGKILL trap, so they are baked FOCUSED to the
+- **External index cache — implemented.** `pi-bench-index build` writes
+  reproducible full indexes under `artifacts/indexes/<INDEX_PROFILE>/` and
+  creates symlinks at each tool's expected path. Completion markers make the
+  operation incremental; a changed image does not rebuild an existing cache.
+- **Repowise (and graft `--deep`) initialization requires an API key.** They
+  are LLM-synthesis tools; full-tree repowise `--mode standard` is a measured
+  ~16h then OOM/SIGKILL trap, so they are initialized FOCUSED to the
   benchmark subtrees (`drivers/gpu/drm/i915`, `drivers/usb/typec` — repowise
   scopes `.repowise/` to the subtree). Key + models live in one gitignored
-  `docker/.env` (see `docker/.env.example`), consumed at build time and
-  scrubbed from the image:
+  `docker/.env` (see `docker/.env.example`), supplied only to the one-time
+  index initialization command:
   ```bash
   cp docker/.env.example docker/.env        # fill OPENROUTER_API_KEY, PI_MODEL, ...
-  docker build -t agent-codebase-bench -f docker/Dockerfile \
-      --secret id=repowise_env,src=docker/.env .
+  docker run --rm --env-file docker/.env \
+      -v "$(pwd)/artifacts:/workspace/artifacts" \
+      --entrypoint /usr/local/bin/pi-bench-index agent-codebase-bench build
   ```
-- **Repowise semantic (vector) search is currently FULL-TEXT-ONLY.** The baked
+- **Repowise semantic (vector) search is currently FULL-TEXT-ONLY.** The external
   vector/embedding index fails to build: `repowise generate` reports
   `Indexed 0 items (N failed)` per subtree. `prepare-index.sh` already exports
   `REPOWISE_EMBEDDER=openrouter` +
   `REPOWISE_EMBEDDING_MODEL=openai/text-embedding-3-small`, yet the vectors
   still fail — strong evidence **repowise 0.41 reads the embedder from
   `.repowise/config.yaml` (the subtree), not process env**, so the env vars are
-  ignored during the bake. Until fixed, `repowise search` works on the wiki
+  ignored during initialization. Until fixed, `repowise search` works on the wiki
   pages (full-text) but not semantically. Fix = set `provider: openrouter` /
   `model: openai/text-embedding-3-small` under an embedding/embedder key in the
   subtree's `.repowise/config.yaml` and confirm OpenRouter actually serves that
-  embedding model, then re-bake.
+  embedding model, then rebuild that external cache identity.
 - **Full matrix run** DONE (`deepseek-v4-flash-0731`, 6 tools × 3 prompts,
   18/18 cells after filling 2 timeouts) → `artifacts/report.html`. Two tips:
   deep typec/trace cells can exceed 1800s and time out — raise per-cell via
-  `PI_CELL_TIMEOUT`; codebase-memory-mcp@0.10.2 OOM-kills its index worker on
-  the full kernel so codebase-memory stays pinned at 0.9.0.
+  `PI_CELL_TIMEOUT`; the original matrix recorded an OOM-kill from
+  codebase-memory-mcp@0.10.2 while indexing the full kernel. The Dockerfile
+  now follows the npm `latest` tag as requested, so rebuilds should verify
+  whether that issue remains resolved upstream.
 - The image pins linux v7.0 to match the prompt era (i915_drv.c exists there;
   on 7.2-era mainline it was restructured and `i915_drv.c` is gone).
 

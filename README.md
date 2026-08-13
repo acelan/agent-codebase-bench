@@ -28,21 +28,17 @@ unavailable to the model, so measurements aren't polluted by a ripgrep fallback)
 
 ## The Docker image
 
-`docker/Dockerfile` builds a self-contained image: pi v0.84.1 (pinned), all
-benchmark tools (pinned), a linux **v7.0** clone, and (optionally) baked tool
-indexes. Key properties:
+`docker/Dockerfile` builds a single image containing pi v0.84.1 (pinned), all
+benchmark tools (pinned), and a linux **v7.0** clone. Indexes are persisted
+outside the image. Key properties:
 
-- **Only `artifacts/` is mounted.** Every benchmark run + the html report lands
-  under the mounted `artifacts/` dir; the kernel, tools, and indexes are baked
-  into the image.
-- **Indexes baked at build** (`ARG BUILD_INDEXES=1`, `docker/prepare-index.sh`)
-  since the kernel is pinned — reproducible, no per-cell re-index. Offline full
-  indexes: codegraph, graft-wiring, codebase-memory-mcp (~21GB). The LLM-synthesis
-  tools (repowise, graft `--deep`) are gated behind an `OPENROUTER_API_KEY` **build
-  SECRET** (`docker/.env`) and scoped to the benchmark subtrees
-  (full-tree parametrization is a measured OOM trap — see the skill).
-- **Cheap tool iteration:** everything that changes often (extension/harness/rtk)
-  is layered *after* the index bake, so adding a tool reuses cached index layers.
+- **Only `artifacts/` is mounted.** Every benchmark run, report, and index cache
+  lands under the mounted directory; the image remains single and portable.
+- **Indexes are external and reusable:** `artifacts/indexes/<INDEX_PROFILE>/`
+  stores codegraph, graft, codebase-memory-mcp, and optional repowise indexes.
+  `pi-bench-index` builds missing indexes and attaches them by symlink.
+- **Cheap tool iteration:** changing the Dockerfile no longer rebuilds indexes.
+  Change `INDEX_PROFILE` when a kernel, tool version, or index recipe changes.
 
 ## Storage model (versioned + averaging)
 
@@ -70,10 +66,15 @@ report.md / report.html / versions.json              aggregates at the model roo
 # one source of truth for key + models (gitignored; copy from docker/.env.example)
 set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, REPOWISE_*
 
-# build the image (bakes indexes; ~1h, ~21GB — move to /tmp if using BUILD_INDEXES=1)
-# --secret feeds repowise/graft --deep bake so they run keyed on the subtrees
-docker build -t agent-codebase-bench -f docker/Dockerfile \
-  --secret id=repowise_env,src=docker/.env .
+# build the single image (does not build indexes)
+docker build -t agent-codebase-bench -f docker/Dockerfile .
+
+# build missing indexes into the host-mounted artifacts/indexes directory
+docker run --rm -it \
+  --env-file docker/.env \
+  -v "$(pwd)/artifacts:/workspace/artifacts" \
+  --entrypoint /usr/local/bin/pi-bench-index \
+  agent-codebase-bench build
 
 # recommended: run the harness in-image; the ONLY host mount is artifacts/
 docker run --rm -it \

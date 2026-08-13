@@ -34,6 +34,7 @@ import pi_transcript
 PI_BIN = os.environ.get("PI_BIN", "pi")          # native pi binary path
 BENCH_IMAGE = os.environ.get("BENCH_IMAGE", "agent-codebase-bench")
 KERNEL_MOUNT = os.environ.get("KERNEL_MOUNT", "")  # "HOSTDIR" -> -v HOSTDIR:/workspace/linux
+INDEX_MOUNT = os.path.abspath(os.environ.get("INDEX_MOUNT", "artifacts"))
 PI_MODEL_FLAG = "--model"                          # pi uses --model provider/model
 # Extension that registers the index tools as custom CLI-backed tools. Used so
 # the native backend (pi running directly in the container on PATH) can call
@@ -81,6 +82,8 @@ def build_cmd(model, query, allowlist, backend="docker"):
         cmd += ["-e", "OPENROUTER_API_KEY"]
     if KERNEL_MOUNT:
         cmd += ["-v", f"{KERNEL_MOUNT}:/workspace/linux"]
+    if os.path.isdir(INDEX_MOUNT):
+        cmd += ["-v", f"{INDEX_MOUNT}:/workspace/artifacts"]
     cmd += [BENCH_IMAGE] + _pi_args(model, query, allowlist)
     return cmd
 

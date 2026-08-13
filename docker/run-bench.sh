@@ -20,6 +20,7 @@ export PI_BIN=pi
 
 mkdir -p /workspace/artifacts
 cd /workspace
+/usr/local/bin/pi-bench-index link
 # Default config is the baked-in one; a caller-supplied --config (later arg)
 # overrides it. cwd=/workspace so results_dir "artifacts" lands on the mount.
 exec /opt/bench-venv/bin/python /opt/pi-bench/bench_pi.py \

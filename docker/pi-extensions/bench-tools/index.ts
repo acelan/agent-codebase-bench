@@ -81,7 +81,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // --- repowise ------------------------------------------------------------
-  // repowise is baked per-subtree (.repowise lives in each indexed subtree,
+  // repowise is initialized per-subtree (.repowise lives in each indexed subtree,
   // not the kernel root), so this tool runs repowise from the subtree that
   // holds the relevant index. i915 is the default benchmark scope; pass a
   // different relative subtree (e.g. drivers/usb/typec) for other code.

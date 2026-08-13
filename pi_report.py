@@ -27,6 +27,7 @@ import argparse
 import html
 import json
 import os
+import re
 
 
 # Metric columns shown per testcase: (summary key, human label, numeric).
@@ -44,6 +45,40 @@ BASE_COLS = [
 OVERVIEW_COLS = [("total", "total tokens", True), ("api", "api calls", True)]
 
 BASELINE_TOOL = "grep"
+
+# Short, report-facing descriptions. Keep these deliberately concise: the
+# report is a benchmark result, not a tool catalogue. URLs point to the
+# upstream project or package page rather than to a local installation.
+TOOL_INFO = {
+    "grep": {
+        "description": "The pi agent's built-in file/search tools, used here as the baseline.",
+        "url": "https://github.com/earendil-works/pi",
+    },
+    "ripgrep": {
+        "description": "A fast recursive text-search tool that scans the tree directly.",
+        "url": "https://github.com/BurntSushi/ripgrep",
+    },
+    "codegraph": {
+        "description": "An indexed code-intelligence and knowledge-graph tool for symbol exploration.",
+        "url": "https://github.com/colbymchenry/codegraph",
+    },
+    "graft": {
+        "description": "A context graph that connects linked Markdown knowledge cards.",
+        "url": "https://github.com/NanoNets/Graft",
+    },
+    "repowise": {
+        "description": "A generated codebase wiki and semantic search/indexing tool.",
+        "url": "https://github.com/repowise-dev/repowise",
+    },
+    "codebase-memory-mcp": {
+        "description": "A structural code graph exposed through a Model Context Protocol server.",
+        "url": "https://github.com/DeusData/codebase-memory-mcp",
+    },
+    "rtk": {
+        "description": "Rust Token Killer, a grep/rg wrapper that compresses command output.",
+        "url": "https://github.com/rtk-ai/rtk",
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +120,10 @@ def load_cells(artifacts, instructions=None):
                 s = json.load(f)
             tool = s.get("tool")
             for p in s.get("prompts", []):
+                # Keep cache/reasoning available for the narrative summary even
+                # though the compact comparison table does not display them.
                 cells = {k: _mean(p.get(k)) for k, _, _ in BASE_COLS}
+                cells.update({k: _mean(p.get(k)) for k in ("cache", "reas")})
                 yield {
                     "model": model,
                     "model_root": mr,
@@ -203,6 +241,148 @@ def _delta_pct(tool_total, base_total):
     pct = (tool_total - base_total) / base_total * 100.0
     cls = "delta-good" if pct < 0 else ("delta-bad" if pct > 0 else "delta-0")
     return pct, cls
+
+
+def _tool_info(tool):
+    return TOOL_INFO.get(tool, {
+        "description": "A code-query tool included in this benchmark.",
+        "url": "",
+    })
+
+
+def _tool_intro_html(rows):
+    """Describe every tool represented in this report, with its project URL."""
+    tools = sorted({r["tool"] for r in rows})
+    items = []
+    for tool in tools:
+        info = _tool_info(tool)
+        link = (f" <a href='{_esc(info['url'])}' target='_blank' rel='noreferrer'>"
+                "project</a>" if info.get("url") else "")
+        items.append(f"<li><b>{_esc(tool)}</b> — {_esc(info['description'])}{link}</li>")
+    return ("<h1>Tools</h1>"
+            "<p>Each tool was isolated and asked the same Linux-kernel questions. "
+            "The links below identify the upstream project or package measured.</p>"
+            "<ul class='tools'>" + "".join(items) + "</ul>")
+
+
+def _trace_evidence(row):
+    """Extract workflow evidence from the recorded iterations, not usage data."""
+    iters = load_iterations(row["model_root"], row["tool_id"], row["pprompt"]) or []
+    calls = []
+    results = []
+    for iteration in iters:
+        for call in iteration.get("calls", []):
+            args = call.get("arguments")
+            if isinstance(args, dict):
+                args = json.dumps(args, ensure_ascii=False)
+            calls.append(f"{call.get('name', '')} {args or ''}")
+        results.extend((r.get("content") or "") for r in iteration.get("results", []))
+    call_text = "\n".join(calls)
+    result_text = "\n".join(results)
+    command_errors = any(re.search(
+        r"(?:\[.*? error\]|path not found:|/usr/bin/grep:|no such file|"
+        r"command failed|invalid (?:argument|query)|missing required)",
+        result, re.I) for result in results)
+    search_calls = [c for c in calls if re.search(r"\b(rg|grep|find|search|query)\b", c, re.I)]
+    return {
+        "calls": calls,
+        "searches": len(search_calls),
+        "reads": sum(bool(re.search(r"\b(read|sed|awk|cat|get_code_snippet|snippet)\b", c, re.I)) for c in calls),
+        "broad_discovery": bool(re.search(r"find /|cd /workspace && ls|ls drivers", call_text)),
+        "repeated_search": len(search_calls) >= 3,
+        "failures": command_errors,
+        "empty_results": any(not result.strip() or result.strip() == "(no output)" for result in results),
+        "large_results": any(len(r) > 5000 for r in results),
+        "graph_results": bool(re.search(
+            r"Found .* symbols|Blast radius|Dynamic-dispatch links|callers_total|"
+            r"relationship|\"rows\"\s*:", result_text, re.I)),
+        "fulltext_results": "Full-text search:" in result_text,
+        "api_setup": bool(re.search(
+            r"schema|project|pagination|search_code|get_code_snippet|query shape|"
+            r"mem\.init|version_cohort", call_text + "\n" + result_text, re.I)),
+        "result_text": result_text,
+    }
+
+
+def _workflow_summary(row):
+    """Explain where a tool saves/spends context based on its actual trace."""
+    tool = row["tool"]
+    evidence = _trace_evidence(row)
+    saves = []
+    spends = []
+    if tool == "rtk":
+        saves.append("compressing grep/rg-style results before they reach the agent")
+        spends.append("re-running searches when compressed output is insufficient")
+    elif tool == "codegraph":
+        saves.append("using compact indexed relationship exploration instead of reconstructing every edge with literal searches")
+        spends.append("interpreting broad blast-radius and source-excerpt responses and filtering irrelevant global matches")
+    elif tool == "codebase-memory-mcp":
+        saves.append("using indexed snippets and relationship queries once the project and query shape are understood")
+        spends.append("learning the API/schema and assembling the requested path from snippets, rows, and graph results")
+    elif tool == "repowise":
+        saves.append("avoiding a raw tree-wide source dump through indexed full-text retrieval")
+        spends.append("comparing ranked full-text snippets and filling structural gaps the search index does not answer")
+    elif tool == "graft":
+        saves.append("following pre-built context links instead of repeating unrelated source searches")
+        spends.append("following links that do not directly resolve the requested code relationship")
+    else:
+        saves.append("using literal matches to anchor the investigation in exact source locations")
+        spends.append("searching candidate names and reading surrounding definitions and callers")
+    if evidence["broad_discovery"]:
+        spends.append("initial filesystem or workspace discovery before the real query")
+    if evidence["repeated_search"] and tool not in ("repowise", "codebase-memory-mcp"):
+        spends.append("repeating or refining searches after the first result was incomplete")
+    if evidence["graph_results"]:
+        saves.append("getting symbol relationships and relevant source excerpts in the same lookup")
+        spends.append("the graph response carrying broad relationship and source context")
+    if evidence["fulltext_results"]:
+        spends.append("ranked full-text results that must be compared and verified")
+    if evidence["api_setup"] and tool == "codebase-memory-mcp":
+        spends.append("project/schema setup, malformed query retries, and pagination before useful results arrive")
+    if evidence["failures"]:
+        spends.append("recovering from empty, missing, or invalid tool results")
+    elif evidence["empty_results"]:
+        spends.append("checking empty search results before switching to a better-scoped query")
+    if evidence["large_results"]:
+        spends.append("large returned source or graph context that then remains in the conversation")
+    if evidence["reads"] and evidence["searches"] and tool not in ("codegraph", "codebase-memory-mcp"):
+        saves.append("moving from candidate matches to focused source windows rather than rereading unrelated files")
+    return (f"Saves context by {_join_phrases(saves)}. "
+            f"Spends context on {_join_phrases(spends)}.")
+
+
+def _join_phrases(items):
+    items = list(dict.fromkeys(items))
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return "; ".join(items[:-1]) + f"; and {items[-1]}"
+
+
+def _results_summary_html(rows):
+    """Summarize strengths and costs from the recorded interaction traces."""
+    prompts = sorted({r["prompt"] for r in rows})
+    sections = ["<details class='result-summary'><summary>Result summary</summary>"
+                "<h1>Result summary</h1>",
+                "<p>These observations come from the recorded interaction traces. "
+                "They describe the workflow choices that save context and the "
+                "follow-up work that spends it, rather than repeating metric values.</p>"]
+    for prompt in prompts:
+        group = [r for r in rows if r["prompt"] == prompt]
+        valid = [r for r in group if r["cells"].get("total") is not None]
+        if not valid:
+            continue
+        winner = min(valid, key=lambda r: r["cells"]["total"])
+        sentences = [f"<b>{_esc(prompt)}</b>: <b>{_esc(winner['tool'])}</b> "
+                     f"has the most economical observed workflow. {_esc(_workflow_summary(winner))}"]
+        for row in sorted(valid, key=lambda r: r["tool"]):
+            if row is winner:
+                continue
+            sentences.append(f"<br><b>{_esc(row['tool'])}</b>: {_esc(_workflow_summary(row))}")
+        sections.append("<p class='finding'>" + " ".join(sentences) + "</p>")
+    sections.append("</details>")
+    return "".join(sections)
 
 
 def _cell_html(value, key, best, worst):
@@ -346,6 +526,9 @@ def _page(title, body):
             "summary{cursor:pointer;font-weight:600}pre{white-space:pre-wrap;background:#fafafa;"
             "border-radius:4px;padding:8px;font-size:12px;max-height:340px;overflow:auto}"
             "h1{font-size:22px}h2{font-size:18px;margin-top:1.4em}"
+            "ul.tools{padding-left:1.4em}.tools li{margin:0.35em 0}"
+            ".finding{background:#f7f9fb;border-left:4px solid #6b8afd;"
+            "padding:8px 12px;line-height:1.45}"
             "</style></head><body>" + body + "</body></html>")
 
 
@@ -367,7 +550,8 @@ def render(artifacts, out_path, instructions=None):
     rows = list(load_cells(artifacts, instructions))
     if not rows:
         raise SystemExit(f"no benchmark runs found under {artifacts}")
-    sections = [_overview_html(rows)]
+    sections = [_overview_html(rows), _tool_intro_html(rows),
+                _results_summary_html(rows)]
     prompts = sorted({r["prompt"] for r in rows})
     for prompt in prompts:
         sections.append(_group_html(prompt, [r for r in rows if r["prompt"] == prompt]))
