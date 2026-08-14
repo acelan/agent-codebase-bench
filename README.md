@@ -86,9 +86,14 @@ docker run --rm -it \
   agent-codebase-bench build
 
 # recommended: run the harness in-image; the ONLY host mount is artifacts/
+# codebase-memory-mcp rejects symlinked cache paths (its coordination fails
+# with "cache-private"), so the CBM cache is bind-mounted as a real dir at
+# /root/.cache/codebase-memory-mcp; pi-bench-index falls back to copying it
+# into place if this mount is omitted.
 docker run --rm -it \
   --env-file docker/.env \
   -v "$(pwd)/artifacts:/workspace/artifacts" \
+  -v "$(pwd)/artifacts/indexes/v7.0-codegraph-1.5.0-graft-0.9.0-repowise-0.41.0-codebase-memory-0.10.2/codebase-memory-mcp:/root/.cache/codebase-memory-mcp" \
   --entrypoint /usr/local/bin/pi-bench-run \
   agent-codebase-bench \
   --model "$PI_MODEL" --backend native --runs 2

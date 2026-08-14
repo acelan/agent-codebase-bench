@@ -125,6 +125,13 @@ def load_cells(artifacts, instructions=None):
                 # though the compact comparison table does not display them.
                 cells = {k: _mean(p.get(k)) for k, _, _ in BASE_COLS}
                 cells.update({k: _mean(p.get(k)) for k in ("cache", "reas")})
+                # Run count each displayed mean rests on (mirrors summary.json's
+                # per-metric n) so tables can show "mean (n=N)" like report.md.
+                cell_n = {}
+                for k, _, _ in BASE_COLS:
+                    stats = p.get(k)
+                    if isinstance(stats, dict):
+                        cell_n[k] = stats.get("n")
                 yield {
                     "model": model,
                     "model_root": mr,
@@ -134,6 +141,7 @@ def load_cells(artifacts, instructions=None):
                     "prompt": p.get("prompt"),
                     "prompt_text": _prompt_text(mr, tid, p, instructions),
                     "cells": cells,
+                    "cell_n": cell_n,
                     "summary": s,
                     "pprompt": p,
                 }
@@ -305,7 +313,7 @@ def _results_summary_html(findings, unavailable=None):
     return "".join(sections)
 
 
-def _cell_html(value, key, best, worst):
+def _cell_html(value, key, best, worst, n=None):
     if value is None:
         return "<td class='num'>—</td>"
     style = ""
@@ -315,8 +323,8 @@ def _cell_html(value, key, best, worst):
     elif value == worst and worst != best:
         style = "worst"
     fmt = fmt_num(value)
-    if key == "wall_s":
-        fmt = fmt_num(value)
+    if n is not None:
+        fmt += f" <span class='mrk'>(n={n})</span>"
     return f"<td class='num {style}'>{fmt}</td>"
 
 
@@ -384,7 +392,8 @@ def _group_html(prompt, rows):
                f"<td class='num {dcls}'>{delta}</td>"]
         for key, _, _ in BASE_COLS:
             best, worst = _best_worst(prompt_rows, key)
-            tds.append(_cell_html(r["cells"].get(key), key, best, worst))
+            tds.append(_cell_html(r["cells"].get(key), key, best, worst,
+                                  (r.get("cell_n") or {}).get(key)))
         trows.append("<tr>" + "".join(tds) + "</tr>")
     h.append("<table class='grp'><thead>" + thead + "</thead><tbody>"
              + "".join(trows) + "</tbody></table>")

@@ -23,13 +23,19 @@ attach_indexes() {
     }
     link_one "$CACHE_DIR/codegraph" "$KERNEL_DIR/.codegraph"
     link_one "$CACHE_DIR/graft" "$KERNEL_DIR/graft"
-    # codebase-memory-mcp rejects symlinked cache paths. When the caller
-    # supplies a direct bind mount, leave it in place; otherwise attach the
-    # cache for tools that tolerate symlinks.
+    # codebase-memory-mcp rejects symlinked cache paths (its coordination
+    # canonicalizes the symlink to the bind-mounted artifacts dir and fails
+    # with "cache-private"). For a bind-mounted cache the caller should mount
+    # it directly at /root/.cache/codebase-memory-mcp; when both are absent,
+    # fall back to copying (not symlinking) the persisted index into place so
+    # the CLI's coordination sees a real on-container path.
     if [ ! -d "/root/.cache/codebase-memory-mcp" ] || \
        [ -L "/root/.cache/codebase-memory-mcp" ]; then
-        link_one "$CACHE_DIR/codebase-memory-mcp" \
+        rm -rf "/root/.cache/codebase-memory-mcp"
+        mkdir -p /root/.cache
+        cp -a "$CACHE_DIR/codebase-memory-mcp" \
             "/root/.cache/codebase-memory-mcp"
+        chmod -R a+rwX "/root/.cache/codebase-memory-mcp"
     fi
     for sub in drivers/gpu/drm/i915 drivers/usb/typec; do
         [ -d "$KERNEL_DIR/$sub" ] || continue

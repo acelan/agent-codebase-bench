@@ -25,7 +25,7 @@ DEFAULT_COMPACTION_SETTINGS = {
     "tail_chars": 100,
     # The analyst is invoked once per testcase.  This is therefore deliberately
     # a per-testcase guard, not a limit on the aggregate evidence document.
-    "max_testcase_chars": 500_000,
+    "max_testcase_chars": 750_000,
 }
 
 _METRIC_KEYS = (
