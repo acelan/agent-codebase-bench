@@ -73,7 +73,7 @@ artifacts/result-summary.json                        cached LLM report analysis 
 
 ```bash
 # one source of truth for key + models (gitignored; copy from docker/.env.example)
-set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, optional PI_SUMMARY_MODEL, REPOWISE_*
+set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, optional PI_SUMMARY_MODEL, REPOWISE_*, OLLAMA_*
 
 # build the single image (does not build indexes)
 docker build -t agent-codebase-bench -f docker/Dockerfile .
@@ -100,6 +100,29 @@ docker run --rm -it \
 
 # host-driven, one-shot containers per cell
 python3 bench_pi.py --model "$PI_MODEL" --backend docker --runs 2
+
+# === Ollama (local provider) ===
+# The model comes from PI_MODEL (e.g. ollama/qwen2.5-coder:0.5b); the harness
+# writes models.json from OLLAMA_BASE_URL automatically (see docs/ollama.md).
+set -a; . docker/.env; set +a   # exports PI_PROVIDER, PI_MODEL, OLLAMA_BASE_URL (and OPENROUTER_API_KEY if repowise/analysis needs it)
+
+# native backend (pi on the host): docker/ollama-models.sh creates ~/.pi/agent/models.json
+docker/ollama-models.sh
+python3 bench_pi.py --model-preset ollama --tools grep,rtk --runs 1
+
+# docker backend: --network host is added automatically so the container reaches 127.0.0.1:11434
+python3 bench_pi.py --model ollama/qwen2.5-coder:0.5b --backend docker --runs 1
+
+# in-image harness (recommended): pass --network host on the outer docker run
+docker run --rm -it \
+  --network host \
+  -e PI_PROVIDER=ollama \
+  -e PI_MODEL=ollama/qwen2.5-coder:0.5b \
+  -e OLLAMA_BASE_URL=$OLLAMA_BASE_URL \
+  -v "$(pwd)/artifacts:/workspace/artifacts" \
+  --entrypoint /usr/local/bin/pi-bench-run \
+  agent-codebase-bench \
+  --model-preset ollama --backend native --runs 1
 
 # recompute averages/reports from already-saved runs only
 python3 bench_pi.py --model "$PI_MODEL" --aggregate-only

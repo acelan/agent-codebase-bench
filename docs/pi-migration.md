@@ -182,6 +182,28 @@ python3 bench_pi.py --model openrouter/deepseek-v4-flash-0731 --aggregate-only
 - The image pins linux v7.0 to match the prompt era (i915_drv.c exists there;
   on 7.2-era mainline it was restructured and `i915_drv.c` is gone).
 
+## Ollama provider
+
+pi 0.84.1 has **no built-in ollama discovery**, so the provider must be declared
+in `models.json` (`~/.pi/agent/models.json`, or `$PI_CODING_AGENT_DIR/models.json`
+in the image). The harness handles this automatically:
+
+- `docker/ollama-models.sh` writes the file from `OLLAMA_BASE_URL` /
+  `PI_MODEL` env (used by the in-image entrypoint and for native runs).
+- the docker one-shot backend generates a **private temp models.json** and
+  mounts it read-only at `/root/.pi/agent/models.json` (`pi_runner.py`), never
+  touching the host's `~/.pi/agent`.
+- `--network host` is added automatically so a one-shot container can reach
+  `127.0.0.1:11434`; for the in-image harness pass `--network host` on the
+  outer `docker run` yourself.
+- `--provider ollama --model <id>` avoids pi's `model:thinking` split, so
+  tags like `qwen2.5-coder:0.5b` survive intact.
+- `PI_PROVIDER` (`ollama` or `openrouter`) selects the provider when both
+  `OPENROUTER_API_KEY` and `OLLAMA_BASE_URL` are configured.
+
+See `docs/ollama.md` for full run instructions and caveats (zero cost, 128K
+default context, `supportsDeveloperRole=false` for the OpenAI-compatible API).
+
 ## Resume from here
 
 - **Restart SHA:** `10be4c2` (clean except the untracked new files below).
