@@ -338,12 +338,13 @@ def _overview_html(rows):
     """Overview table (req 2): tool@version | total tokens | api calls | Δ vs grep.
 
     Also shows the mean elapsed (wall_s) per tool so runtime cost is visible
-    next to token cost — averaged over the same runs as total tokens.
+    next to token cost — averaged over the same runs as total tokens. Each
+    metric cell shows (n=N) = how many validated runs the mean rests on.
     """
     by_tool = {}
     for r in rows:
         b = by_tool.setdefault(r["tool_id"], {
-            "total": 0.0, "api": 0, "wall": [], "n": 0,
+            "total": 0.0, "api": 0, "wall": [], "n": 0, "n_runs": 0,
             "model": set(), "tool": r.get("tool"),
         })
         b["total"] += float(r["cells"].get("total") or 0)
@@ -352,6 +353,10 @@ def _overview_html(rows):
         if w is not None:
             b["wall"].append(float(w))
             b["n"] += 1
+        # Run count behind this cell (mirrors per-metric n in summary.json).
+        # All BASE_COLS metrics in a cell share the same run set.
+        cell_n = r.get("cell_n") or {}
+        b["n_runs"] += cell_n.get("total") or cell_n.get("wall_s") or 0
         b["model"].add(r["model"])
     grep_total = by_tool.get(BASELINE_TOOL, {}).get("total") or next(
         (v["total"] for k, v in by_tool.items() if k.startswith(BASELINE_TOOL + "@")), None)
@@ -373,17 +378,19 @@ def _overview_html(rows):
         pct, dcls = _delta_pct(v["total"], grep_total)
         delta = "+0%" if tid == BASELINE_TOOL or v.get("tool") == BASELINE_TOOL else ("" if pct is None else f"{pct:+.0f}%")
         nm = " <span class='mrk'>" + ", ".join(sorted(v["model"])) + "</span>" if len(v["model"]) > 1 else ""
+        n_mark = f" <span class='mrk'>(n={v['n_runs']})</span>" if v["n_runs"] else ""
         body.append(
             f"<tr><td><b>{_esc(tid)}</b>{nm}</td>"
-            f"<td class='num {tcl}'>{fmt_num(v['total'])}</td>"
-            f"<td class='num {acl}'>{v['api']}</td>"
-            f"<td class='num {wcl}'>{fmt_num(wmean)}</td>"
+            f"<td class='num {tcl}'>{fmt_num(v['total'])}{n_mark}</td>"
+            f"<td class='num {acl}'>{v['api']}{n_mark}</td>"
+            f"<td class='num {wcl}'>{fmt_num(wmean)}{n_mark}</td>"
             f"<td class='num {dcls}'>{delta}</td></tr>"
         )
     return ("<h1>Overview</h1>"
             "<p>Aggregated across all testcases and models, cheapest -> costliest "
             "(best green, worst red). Δ vs grep on total tokens; elapsed is the "
-            "mean wall-clock per run.</p>"
+            "mean wall-clock per run, and (n=N) shows the number of validated "
+            "runs each mean rests on.</p>"
             "<table class='ov'><thead>" + thead + "</thead><tbody>"
             + "".join(body) + "</tbody></table>")
 
