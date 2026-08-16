@@ -8,7 +8,7 @@ re-rendered; it spans whatever models are present.
 
 Layout (each maps to an explicit requirement):
   1. output lives under artifacts/ (aggregates across models)
-  2. overview table (tool@version | total tokens | api calls — NO cost column)
+  2. overview table (tool@version | total tokens | api calls | elapsed | Δ vs grep)
      at the top, cheapest -> costliest
   3. results grouped by testcase (prompt)
   4. grep is the baseline: every tool shows -xx% / +xx% token delta vs grep
@@ -121,6 +121,12 @@ def load_cells(artifacts, instructions=None):
                 s = json.load(f)
             tool = s.get("tool")
             for p in s.get("prompts", []):
+                # Skip cells whose every run was a detected failure. aggregate
+                # already removes failed runs+folders, but a standalone
+                # pi_report run on stale summary.json must not resurrect them.
+                rl = p.get("run_log") or []
+                if rl and all(not r.get("transcript") for r in rl):
+                    continue
                 # Keep cache/reasoning available for the narrative summary even
                 # though the compact comparison table does not display them.
                 cells = {k: _mean(p.get(k)) for k, _, _ in BASE_COLS}
@@ -329,25 +335,41 @@ def _cell_html(value, key, best, worst, n=None):
 
 
 def _overview_html(rows):
-    """Overview table (req 2): tool@version | total tokens | api calls | Δ vs grep."""
+    """Overview table (req 2): tool@version | total tokens | api calls | Δ vs grep.
+
+    Also shows the mean elapsed (wall_s) per tool so runtime cost is visible
+    next to token cost — averaged over the same runs as total tokens.
+    """
     by_tool = {}
     for r in rows:
-        b = by_tool.setdefault(r["tool_id"], {"total": 0.0, "api": 0, "model": set(), "tool": r.get("tool")})
+        b = by_tool.setdefault(r["tool_id"], {
+            "total": 0.0, "api": 0, "wall": [], "n": 0,
+            "model": set(), "tool": r.get("tool"),
+        })
         b["total"] += float(r["cells"].get("total") or 0)
         b["api"] += int(r["cells"].get("api") or 0)
+        w = r["cells"].get("wall_s")
+        if w is not None:
+            b["wall"].append(float(w))
+            b["n"] += 1
         b["model"].add(r["model"])
     grep_total = by_tool.get(BASELINE_TOOL, {}).get("total") or next(
         (v["total"] for k, v in by_tool.items() if k.startswith(BASELINE_TOOL + "@")), None)
     items = sorted(by_tool.items(), key=lambda kv: kv[1]["total"])
     total_max = max((v["total"] for v in by_tool.values()), default=0)
     api_max = max((v["api"] for v in by_tool.values()), default=0)
+    wall_max = max((sum(v["wall"]) / v["n"] for v in by_tool.values() if v["n"]), default=0)
     best_t = min(by_tool.values(), key=lambda v: v["total"])["total"] if by_tool else 0
     best_a = min(by_tool.values(), key=lambda v: v["api"])["api"] if by_tool else 0
-    thead = "<tr><th>tool@version</th><th>total tokens</th><th>api calls</th><th>Δ vs grep</th></tr>"
+    best_w = min((sum(v["wall"]) / v["n"] for v in by_tool.values() if v["n"]), default=0)
+    thead = ("<tr><th>tool@version</th><th>total tokens</th><th>api calls</th>"
+             "<th>elapsed (s)</th><th>Δ vs grep</th></tr>")
     body = []
     for tid, v in items:
         tcl = "best" if v["total"] == best_t else ("worst" if v["total"] == total_max and total_max != best_t else "")
         acl = "best" if v["api"] == best_a else ("worst" if v["api"] == api_max and api_max != best_a else "")
+        wmean = (sum(v["wall"]) / v["n"]) if v["n"] else None
+        wcl = "best" if wmean is not None and wmean == best_w else ("worst" if wmean is not None and wmean == wall_max and wall_max != best_w else "")
         pct, dcls = _delta_pct(v["total"], grep_total)
         delta = "+0%" if tid == BASELINE_TOOL or v.get("tool") == BASELINE_TOOL else ("" if pct is None else f"{pct:+.0f}%")
         nm = " <span class='mrk'>" + ", ".join(sorted(v["model"])) + "</span>" if len(v["model"]) > 1 else ""
@@ -355,11 +377,13 @@ def _overview_html(rows):
             f"<tr><td><b>{_esc(tid)}</b>{nm}</td>"
             f"<td class='num {tcl}'>{fmt_num(v['total'])}</td>"
             f"<td class='num {acl}'>{v['api']}</td>"
+            f"<td class='num {wcl}'>{fmt_num(wmean)}</td>"
             f"<td class='num {dcls}'>{delta}</td></tr>"
         )
     return ("<h1>Overview</h1>"
             "<p>Aggregated across all testcases and models, cheapest -> costliest "
-            "(best green, worst red). Δ vs grep on total tokens.</p>"
+            "(best green, worst red). Δ vs grep on total tokens; elapsed is the "
+            "mean wall-clock per run.</p>"
             "<table class='ov'><thead>" + thead + "</thead><tbody>"
             + "".join(body) + "</tbody></table>")
 

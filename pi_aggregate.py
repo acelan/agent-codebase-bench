@@ -71,7 +71,12 @@ def _stats(values):
 
 
 def aggregate(model_root, artifacts_root=None):
-    """Compute per-(tool@version,prompt) averages for one model run dir."""
+    """Compute per-(tool@version,prompt) averages for one model run dir.
+
+    Runs marked failed (runner-side failure detection: cache-private bridge
+    down, empty output, crashes, nonzero exit) are excluded from every metric,
+    including n_runs, so a broken cell never inflates an average or a report.
+    """
     summaries = []
     if not os.path.isdir(model_root):
         return summaries
@@ -87,10 +92,106 @@ def aggregate(model_root, artifacts_root=None):
             continue
         if not runs:
             continue
+        # Re-derive failure for pre-detector runs (older runs.json rows have no
+        # 'failed' key but their usage.error / transcripts still signal a dud),
+        # DELETE their artifact files, and drop them from runs.json so the
+        # artifacts tree no longer contains measured-broken runs at all.
+        runs, removed = _clean_failed_runs(d, name, runs)
+        if not runs:
+            # No usable runs remain for this tool@version -> drop the folder.
+            _prune_empty_folder(d, name)
+            continue
+        if removed:
+            with open(runs_path, "w", encoding="utf-8") as f:
+                json.dump(runs, f, indent=2, ensure_ascii=False)
         summaries.append(_summarize_tool(d, name, runs))
     if summaries:
         _write_report(model_root, summaries)
     return summaries
+
+
+def _clean_failed_runs(folder, name, runs):
+    """Remove failed runs from artifacts (rows + their files).
+
+    Returns (usable_runs, removed_count). For every failed run row the
+    transcript/usage files named in the row are deleted. runs.json is NOT
+    rewritten here if nothing changed; the caller rewrites it when removed > 0.
+    """
+    kept = []
+    removed = 0
+    for r in runs:
+        if not _run_is_failed(r, folder):
+            kept.append(r)
+            continue
+        removed += 1
+        for key in ("transcript_json", "transcript_jsonl"):
+            fn = r.get(key)
+            if fn:
+                try:
+                    os.unlink(os.path.join(folder, fn))
+                except OSError:
+                    pass
+        # <tool_id>-<prompt>-<run_ts>.json usage file (derived filename).
+        usage_fn = f"{r.get('tool_id')}-{r.get('prompt')}-{r.get('run_ts')}.json"
+        try:
+            os.unlink(os.path.join(folder, usage_fn))
+        except OSError:
+            pass
+        print(f"    removed failed run {name}: {r.get('prompt')} "
+              f"{r.get('run_ts')} ({r.get('error') or (r.get('usage') or {}).get('error')})")
+    return kept, removed
+
+
+def _run_is_failed(r, folder):
+    """True when a run row is a detected failure (or a pre-detector dud)."""
+    if r.get("failed"):
+        return True
+    u = r.get("usage") or {}
+    if isinstance(u, dict) and u.get("error"):
+        return True
+    # Pre-detector rows: a nonzero exit with no final answer, or transcripts
+    # whose tool results all carry the hard-failure markers.
+    tf = r.get("transcript_json")
+    if tf:
+        tp = os.path.join(folder, tf)
+        try:
+            with open(tp, encoding="utf-8") as f:
+                trace = json.load(f)
+        except Exception:
+            trace = None
+        if trace:
+            import pi_runner
+            reason = pi_runner.run_failed_reason(
+                trace, exit_code=r.get("exit"), wall=r.get("wall_seconds"))
+            if reason:
+                return True
+    return False
+
+
+def _prune_empty_folder(folder, name):
+    """Remove a tool@version folder left with only failed runs.
+
+    Files with a run_ts token are deleted; summary.json / runs.json are removed
+    so the report no longer lists a tool@version with zero usable runs.
+    """
+    import re
+    run_ts_re = re.compile(r"-\d{8}_\d{6}_\d{3}\.")
+    for fn in os.listdir(folder):
+        if run_ts_re.search(fn):
+            try:
+                os.unlink(os.path.join(folder, fn))
+            except OSError:
+                pass
+    for stub in ("summary.json", "runs.json"):
+        try:
+            os.unlink(os.path.join(folder, stub))
+        except OSError:
+            pass
+    try:
+        os.rmdir(folder)
+    except OSError:
+        pass
+    print(f"    pruned {name}: no usable runs (all failed)")
 
 
 def _summarize_tool(folder, name, runs):

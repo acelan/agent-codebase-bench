@@ -98,7 +98,13 @@ report.md / report.html / versions.json              aggregates, one model root
 
 - Every cell run gets a `run_ts` (UTC microsecond token) in its filename, so the
   same `tool@version` can be benchmarked many times with **every run kept** and
-  each individually findable.
+  each individually findable. **Unless the run failed** — `pi_runner.py`
+  detects cells whose tool could not actually be exercised
+  (codebase-memory-mcp `cache-private` bridge down, empty/no output, timeout or
+  crash with no final answer, nonzero exit) and persists nothing for them (no
+  transcript, no usage file, no `runs.json` row). `pi_aggregate.py` additionally
+  sweeps pre-detector failed rows (files + rows) out of the artifacts tree when
+  it runs, so averages and reports only ever see cells the tool actually served.
 - Version = `tool --version` probe (`pi_versions.py`); if a tool reports none,
   the **kernel git HEAD short hash** is used (the final-commit identity of what
   is actually measured). The built-in `grep` tool is the pi agent's search tool

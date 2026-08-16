@@ -56,10 +56,17 @@ artifacts/result-summary.json                        cached LLM report analysis 
 
 - Every run is timestamped, so the same `tool@version` can be benchmarked many
   times with every run kept.
+- **Failed runs are discarded, not saved.** `pi_runner.py` detects cells whose
+  tool could not actually be exercised (codebase-memory-mcp `cache-private`
+  bridge-down, empty/no output, timeout/crash/no final answer, nonzero exit)
+  and persists nothing for them — no transcript, no usage file, no `runs.json`
+  row; the caller sees a discarded result and keeps going. `pi_aggregate.py`
+  also sweeps older failed rows (files + rows) out of the artifacts tree, so a
+  broken cell never inflates an average or a report.
 - Version = `tool --version` probe (`pi_versions.py`); fallback = kernel git HEAD
   hash when the tool reports none.
-- `pi_aggregate.py` averages across all runs (mean/median/min/max + n) per metric
-  (total/in/out/cache/reasoning/api/cost/wall/tool-calls).
+- `pi_aggregate.py` averages across all *validated* runs (mean/median/min/max + n)
+  per metric (total/in/out/cache/reasoning/api/cost/wall/tool-calls).
 - `artifacts/result-summary.json` caches the LLM analysis used by the HTML
   Result summary. Its fingerprint covers the normalized metrics and transcripts,
   analyst model, prompt/schema version, and compaction settings. Report generation

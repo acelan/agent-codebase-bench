@@ -18,7 +18,11 @@ Storage model (see docs/pi-migration.md):
     ...-<run_ts>.transcript.json / .jsonl
     runs.json                                          append-only list of runs
 Each run is timestamped so the same tool@version can be benchmarked many times
-with every result kept; pi_aggregate computes averages over all runs.
+with every VALID result kept; pi_aggregate computes averages over all runs.
+Runs whose tool could not actually be exercised (cache-private bridge down,
+empty output, timeout/crash without a final answer, nonzero exit) are
+discarded on the spot — nothing is persisted for them, so a broken cell never
+pollutes the averages or reports.
 """
 from __future__ import annotations
 
@@ -237,30 +241,57 @@ def run_cell(cfg, tool, prompt, tool_version, version_source, run_ts,
     _cleanup_models_json()
 
     if r is None or (r.stdout or "").strip() == "":
-        row = _empty_row(tool, v, version_source, prompt, run_ts, None, wall)
-    else:
-        with open(jsonl_path, "w", encoding="utf-8") as f:
-            f.write(r.stdout)
-        trace = pi_transcript.parse_stream(jsonl_path)
-        usage = _usage_from_trace(trace, cfg, wall, trace.get("session_id"))
-        with open(usage_path, "w", encoding="utf-8") as f:
-            json.dump(usage, f, indent=2, ensure_ascii=False)
-        with open(struct_path, "w", encoding="utf-8") as f:
-            json.dump(trace, f, indent=2, ensure_ascii=False)
-        row = {
-            "tool": tool, "tool_version": v, "tool_id": tool_id,
-            "version_source": version_source,
-            "model": cfg.get("model"), "provider": cfg.get("provider"),
-            "prompt": prompt["id"], "run_ts": run_ts,
-            "exit": getattr(r, "returncode", None),
-            "wall_seconds": round(wall, 3),
-            "usage": usage,
-            "transcript_jsonl": os.path.basename(jsonl_path),
-            "transcript_json": os.path.basename(struct_path),
-            "summary": trace.get("summary"),
-        }
-        if getattr(r, "returncode", 0) != 0:
-            print(f"    exit={r.returncode} stderr={r.stderr.strip()[:300]}")
+        # Empty / timed-out run: the cell produced nothing usable. Per the
+        # "discard failed results" contract, do not persist any artifact and
+        # do not append a row to runs.json; just log and return.
+        print("    FAILED: empty/no output", flush=True)
+        return _failed_result(tool, v, version_source, prompt, run_ts, wall,
+                              "empty/no output")
+    with open(jsonl_path, "w", encoding="utf-8") as f:
+        f.write(r.stdout)
+    trace = pi_transcript.parse_stream(jsonl_path)
+    usage = _usage_from_trace(trace, cfg, wall, trace.get("session_id"))
+    # Infer a failed run (see run_failed_reason): a cell whose tool could not
+    # actually be exercised (e.g. codebase-memory-mcp's cache-private bridge is
+    # down, timeouts, crashes). Failed runs are NOT persisted at all — the
+    # .json/.transcript files and the runs.json row are skipped so aggregations
+    # and reports never see a dud measured as a successful benchmark run.
+    failure = run_failed_reason(
+        trace,
+        exit_code=getattr(r, "returncode", None),
+        wall=wall,
+    )
+    if failure:
+        print(f"    FAILED: {failure}", flush=True)
+        try:
+            os.unlink(jsonl_path)
+        except OSError:
+            pass
+        try:
+            os.unlink(struct_path)
+        except OSError:
+            pass
+        return _failed_result(tool, v, version_source, prompt, run_ts, wall,
+                              failure)
+
+    with open(usage_path, "w", encoding="utf-8") as f:
+        json.dump(usage, f, indent=2, ensure_ascii=False)
+    with open(struct_path, "w", encoding="utf-8") as f:
+        json.dump(trace, f, indent=2, ensure_ascii=False)
+    row = {
+        "tool": tool, "tool_version": v, "tool_id": tool_id,
+        "version_source": version_source,
+        "model": cfg.get("model"), "provider": cfg.get("provider"),
+        "prompt": prompt["id"], "run_ts": run_ts,
+        "exit": getattr(r, "returncode", None),
+        "wall_seconds": round(wall, 3),
+        "usage": usage,
+        "transcript_jsonl": os.path.basename(jsonl_path),
+        "transcript_json": os.path.basename(struct_path),
+        "summary": trace.get("summary"),
+    }
+    if getattr(r, "returncode", 0) != 0:
+        print(f"    exit={r.returncode} stderr={r.stderr.strip()[:300]}")
 
     # Append-only runs log.
     runs = []
@@ -276,13 +307,21 @@ def run_cell(cfg, tool, prompt, tool_version, version_source, run_ts,
     return row
 
 
-def _empty_row(tool, v, version_source, prompt, run_ts, rc, wall):
+def _failed_result(tool, v, version_source, prompt, run_ts, wall, reason):
+    """Return value for a detected failure (tool could not be exercised).
+
+    Failed runs are discarded per the benchmark contract: no transcript, no
+    usage file, and NO runs.json row. The returned dict is only for the caller
+    (bench_pi.py) to see the outcome; nothing is persisted.
+    """
     return {
         "tool": tool, "tool_version": v, "tool_id": f"{tool}@{v}",
         "version_source": version_source, "prompt": prompt["id"],
-        "run_ts": run_ts, "exit": rc, "wall_seconds": round(wall, 3),
-        "usage": {"error": "empty/no output"},
+        "run_ts": run_ts, "exit": None, "wall_seconds": round(wall, 3),
+        "failed": True, "error": reason,
+        "usage": {"error": reason},
         "transcript_json": None, "transcript_jsonl": None, "summary": None,
+        "discarded": True,
     }
 
 
@@ -309,3 +348,62 @@ def _usage_from_trace(trace, cfg, wall, session_id):
         "interrupted": False, "turn_exit_reason": "pi_one_shot",
         "duration_seconds": round(wall, 3),
     }
+
+
+# ---------------------------------------------------------------------------
+# failure detection
+# ---------------------------------------------------------------------------
+
+# Marker strings that indicate a tool result is a hard/infrastructure failure
+# rather than a normal empty or error answer the model is expected to handle.
+# The biggest offender historically is codebase-memory-mcp's CLI bridge being
+# down (cache-private coordination), which made a WHOLE cell fail while the
+# model still produced a final answer — so the run's token usage looked valid
+# and polluted the averages. See docker/index-cache.sh for the fix.
+HARD_FAIL_MARKERS = (
+    "secure cli coordination could not be created",
+    "cache-private",
+)
+
+
+def run_failed_reason(trace, exit_code=None, wall=None):
+    """Return a human-readable failure reason if a run cell is a dud.
+
+    A cell is considered failed when the tool under test could not actually be
+    exercised, even if pi returned exit 0 and tokens were spent:
+
+      * no parsed stream (empty output / parse error) -> 'empty/no output'
+      * every tool result is a hard failure marker
+        (e.g. codebase-memory-mcp 'cache-private' bridge down)
+      * no successful tool result AND no final answer
+        (killed / timeout / crash mid-cell)
+      * the process itself exited nonzero (subprocess-level failure)
+
+    Runs that merely contain a few failed calls alongside successful ones (the
+    model retried and recovered) are NOT marked — they measure the normal
+    exploration behavior.
+    """
+    if trace.get("error"):
+        return trace["error"]
+    results = [e for e in trace.get("events", [])
+               if e.get("type") == "tool_result"]
+    ok = 0
+    hard = []
+    for e in results:
+        content = e.get("content") or ""
+        cl = content.lower()
+        if any(m in cl for m in HARD_FAIL_MARKERS):
+            hard.append(content)
+        elif content.strip():
+            ok += 1
+    if results and ok == 0 and hard:
+        return hard[0].strip()[:300]
+    has_final = any(e.get("type") == "final_answer"
+                    for e in trace.get("events", []))
+    if not has_final and ok == 0 and not hard:
+        # No final answer and not a single usable tool result: the cell died
+        # (timeout / OOM / stream truncated). exit=-3 is pi's SIGTERM marker.
+        return "no final answer / no usable tool result"
+    if exit_code not in (None, 0):
+        return f"exit code {exit_code}"
+    return None
