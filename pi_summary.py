@@ -15,7 +15,7 @@ from pi_stream import text_content
 
 SCHEMA_VERSION = "1"
 PROMPT_VERSION = "1"
-COMPACTION_VERSION = "3"
+COMPACTION_VERSION = "4"
 
 DEFAULT_COMPACTION_SETTINGS = {
     # Keep each recorded interaction small enough that a testcase containing
@@ -25,7 +25,14 @@ DEFAULT_COMPACTION_SETTINGS = {
     "tail_chars": 100,
     # The analyst is invoked once per testcase.  This is therefore deliberately
     # a per-testcase guard, not a limit on the aggregate evidence document.
-    "max_testcase_chars": 750_000,
+    "max_testcase_chars": 1_000_000,
+    # Bound how many iterations per workflow (primary run + additional runs)
+    # are expanded for the analyst. Benchmark cells can amass dozens of
+    # iterations per run and several runs per cell (rtk/repowise deep cells
+    # hit 60-80 iterations), which blows past max_testcase_chars even with
+    # per-content compaction. The analyst only needs a representative prefix:
+    # the first N iterations capture the tool-call pattern and result shape.
+    "max_workflow_iterations": 28,
 }
 
 _METRIC_KEYS = (
@@ -305,6 +312,24 @@ def normalize_evidence(
             prompt_row,
         )
         path = _transcript_path(row)
+        # Bound the analyst input: keep only the first max_workflow_iterations
+        # per workflow (combined across the primary run + additional runs) so
+        # deep cells (rtk/repowise with 60-80 iterations per run, several runs
+        # per cell) stay under max_testcase_chars. The prefix captures the
+        # representative tool-call/result pattern; we record how many were
+        # omitted.
+        wf_cap = settings["max_workflow_iterations"]
+        primary_omitted = 0
+        if iterations is not None:
+            if len(iterations) <= wf_cap:
+                kept_count = len(iterations)
+            else:
+                primary_omitted = len(iterations) - wf_cap
+                iterations = iterations[:wf_cap]
+                kept_count = wf_cap
+        else:
+            kept_count = 0
+        omitted_count = primary_omitted
         additional_runs = []
         for run_index, run in enumerate((prompt_row.get("run_log") or [])[1:], start=1):
             run_prompt = dict(prompt_row)
@@ -314,6 +339,16 @@ def normalize_evidence(
                 str(row.get("tool_id") or ""),
                 run_prompt,
             )
+            run_omitted = 0
+            if run_iterations is not None and kept_count < wf_cap:
+                take = run_iterations[: wf_cap - kept_count]
+                run_omitted = len(run_iterations) - len(take)
+                run_iterations = take
+                kept_count += len(take)
+            elif run_iterations is not None:
+                run_omitted = len(run_iterations)
+                run_iterations = []
+            omitted_count += run_omitted
             additional_runs.append({
                 "run_index": run_index,
                 "transcript": {
@@ -324,6 +359,7 @@ def normalize_evidence(
                     _normalize_iteration(iteration, settings)
                     for iteration in run_iterations
                 ],
+                "omitted_iterations": run_omitted,
             })
         metrics_source = row.get("cells") or {}
         metrics = {
@@ -348,6 +384,10 @@ def normalize_evidence(
                 _normalize_iteration(iteration, settings) for iteration in iterations
             ],
         }
+        if primary_omitted:
+            workflow["omitted_primary_iterations"] = primary_omitted
+        if omitted_count:
+            workflow["omitted_iterations_total"] = omitted_count
         if additional_runs:
             workflow["additional_runs"] = additional_runs
         group["workflows"].append(workflow)
