@@ -731,7 +731,12 @@ def ensure_summary(
         command = build_analyst_cmd(model)
         finding = None
         meta = {}
-        for attempt in range(2):
+        # Up to 4 attempts: on a large testcase the analyst can return valid
+        # JSON with an incorrect winner, duplicate workflow costs, or a
+        # missing label; each retry appends the exact validation error so the
+        # model can correct itself. Giving up early used to fail the whole
+        # report on the first schema slip.
+        for attempt in range(4):
             try:
                 # Large normalized traces exceed Linux's per-argument limit;
                 # pi's print mode accepts the prompt on standard input.
@@ -754,12 +759,14 @@ def ensure_summary(
                 finding = validate_finding(parse_analyst_json(answer), testcase)
                 break
             except (TypeError, ValueError) as exc:
-                if attempt:
+                if attempt == 3:
                     raise
                 prompt += (
                     "\nYOUR PREVIOUS JSON FAILED VALIDATION:\n"
                     f"{answer}\nVALIDATION ERROR: {exc}\n"
-                    "Return one corrected JSON object only. Preserve every exact workflow label."
+                    "Return one corrected JSON object only. Preserve every exact "
+                    "workflow label (each exactly once) and pick the winner with "
+                    "the lowest total-token metric."
                 )
         if finding is None:
             raise RuntimeError(f"analyst produced no finding for {testcase.get('testcase')}")
