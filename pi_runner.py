@@ -26,6 +26,7 @@ import json
 import os
 import shlex
 import subprocess
+import tempfile
 import time
 
 import pi_transcript
@@ -42,9 +43,21 @@ PI_MODEL_FLAG = "--model"                          # pi uses --model provider/mo
 # relies on the image entrypoint to add the extension.
 PROBE_EXT = "/opt/pi-bench/extensions/bench-tools/index.ts"
 
+# Host-side temp models.json files handed to docker runs; run_cell() unlinks
+# them after the container finishes so mounts never dangle.
+_MODELS_JSON_PENDING = []
+
 # Per-cell runtime limit (seconds); override with PI_CELL_TIMEOUT. Default 1800s
 # (30 min) may be too short for the deep typec root-cause cells.
 CELL_TIMEOUT = int(os.environ.get("PI_CELL_TIMEOUT", "1800"))
+
+# Ollama needs pi's models.json to declare the local/remote provider (pi 0.84.1
+# has no built-in ollama discovery). The runner generates a private models.json
+# on the fly — never touching the user's ~/.pi/agent/models.json. The model id
+# comes from the benchmark model itself (e.g. "ollama/qwen2.5-coder:0.5b"), so
+# no separate OLLAMA_MODELS setting is needed.
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1")
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "ollama")
 
 # The pi -t allowlist for each benchmark tool (key = benchmark tool name).
 TOOL_SET = {
@@ -61,30 +74,124 @@ TOOL_SET = {
 }
 
 
-def _pi_args(model, query, allowlist):
-    """The pi argv for a headless one-shot run (provider embedded in model)."""
-    args = [PI_MODEL_FLAG, model, "--mode", "json", "-p", "--no-session"]
+def _pi_args(model, query, allowlist, provider=None):
+    """The pi argv for a headless one-shot run.
+
+    provider is passed separately for ollama (which needs --provider ollama
+    --model <id> because model ids carry a :tag and pi must resolve against
+    the models.json-declared provider).
+    """
+    args = []
+    if provider == "ollama":
+        model_id = model.split("/", 1)[-1] if "/" in model else model
+        args += ["--provider", "ollama", "--model", model_id]
+    else:
+        args += [PI_MODEL_FLAG, model]
+    args += ["--mode", "json", "-p", "--no-session"]
     if allowlist:
         args += ["--tools", allowlist]
     args += [query]
     return args
 
 
-def build_cmd(model, query, allowlist, backend="docker"):
+def _write_ollama_models_json(model_id, path=None):
+    """Write a private models.json for the ollama provider.
+
+    pi 0.84.1 requires the provider to be declared in models.json; the runner
+    generates one on the fly (never touching the user's ~/.pi/agent). The
+    model id is embedded so pi resolves --model <id> without OLLAMA_MODELS.
+    path is the destination; if None a temp file is created. Returns the path.
+    """
+    provider = {
+        "baseUrl": OLLAMA_BASE_URL,
+        "api": "openai-completions",
+        "apiKey": OLLAMA_API_KEY,
+        "compat": {"supportsDeveloperRole": False,
+                   "supportsReasoningEffort": False},
+        "models": [{"id": model_id}],
+    }
+    doc = {"providers": {"ollama": provider}}
+    if path is None:
+        fd, path = tempfile.mkstemp(prefix="pi-ollama-models-", suffix=".json")
+        os.close(fd)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2)
+    return path
+
+
+def _warn_ollama_models_json():
+    """Print a one-line hint when native pi may not see the ollama provider."""
+    candidates = []
+    if os.environ.get("PI_CODING_AGENT_DIR"):
+        candidates.append(os.path.join(os.environ["PI_CODING_AGENT_DIR"],
+                                       "models.json"))
+    candidates.append(os.path.expanduser("~/.pi/agent/models.json"))
+    declared = False
+    for c in candidates:
+        if not os.path.exists(c):
+            continue
+        try:
+            if "ollama" in open(c, encoding="utf-8").read():
+                declared = True
+                break
+        except Exception:
+            continue
+    if not declared:
+        print("    [ollama] native pi needs the ollama provider in "
+              "$PI_CODING_AGENT_DIR/models.json or ~/.pi/agent/models.json; "
+              "run docker/ollama-models.sh (sets OLLAMA_BASE_URL) "
+              "or export PI_CODING_AGENT_DIR to a generated dir.")
+
+def _cleanup_models_json():
+    """Remove host-side temp models.json files handed to docker runs."""
+    while _MODELS_JSON_PENDING:
+        p = _MODELS_JSON_PENDING.pop()
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
+
+
+def build_cmd(model, query, allowlist, backend="docker", provider=None):
     if backend == "native":
         cmd = [PI_BIN]
         if os.path.exists(PROBE_EXT):
             cmd += ["--extension", PROBE_EXT]
-        cmd += _pi_args(model, query, allowlist)
+        cmd += _pi_args(model, query, allowlist, provider)
+        if provider == "ollama":
+            # Native pi reads ~/.pi/agent/models.json (or $PI_CODING_AGENT_DIR).
+            # Help the user when the ollama provider is not declared yet.
+            _warn_ollama_models_json()
         return cmd
     cmd = ["docker", "run", "--rm"]
     if os.environ.get("OPENROUTER_API_KEY"):
         cmd += ["-e", "OPENROUTER_API_KEY"]
+    if provider == "ollama":
+        # Reach the ollama server (localhost on the host, or a LAN URL) and
+        # declare the provider via a generated models.json mount. --network
+        # host is the simplest way for a one-shot container to reach
+        # 127.0.0.1:11434 on the host. We point PI_CODING_AGENT_DIR at a
+        # private per-run dir (NOT /root/.pi/agent) so the entrypoint's
+        # ollama-models generator (which writes /root/.pi/agent) and our
+        # read-only mount never collide.
+        cmd += ["--network", "host"]
+        # The generated models.json already carries baseUrl/apiKey, so we do
+        # NOT pass OLLAMA_BASE_URL env here — that would trigger the
+        # entrypoint's ollama-models generator to write $PI_CODING_AGENT_DIR
+        # (our RO mount) and fail. The mount alone is the source of truth.
+        models_json = _write_ollama_models_json(
+            model.split("/", 1)[-1] if "/" in model else model)
+        agent_dir = os.path.join(tempfile.gettempdir(), "pi-agent-ollama")
+        os.makedirs(agent_dir, exist_ok=True)
+        cmd += ["-e", f"PI_CODING_AGENT_DIR={agent_dir}"]
+        cmd += ["-v", f"{models_json}:{agent_dir}/models.json:ro"]
+        # Remember the host temp file; run_cell() unlinks it after the run.
+        _MODELS_JSON_PENDING.append(models_json)
     if KERNEL_MOUNT:
         cmd += ["-v", f"{KERNEL_MOUNT}:/workspace/linux"]
     if os.path.isdir(INDEX_MOUNT):
         cmd += ["-v", f"{INDEX_MOUNT}:/workspace/artifacts"]
-    cmd += [BENCH_IMAGE] + _pi_args(model, query, allowlist)
+    cmd += [BENCH_IMAGE] + _pi_args(model, query, allowlist, provider)
     return cmd
 
 
@@ -109,10 +216,12 @@ def run_cell(cfg, tool, prompt, tool_version, version_source, run_ts,
     instruction = cfg["tool_instruction"].get(tool, "")
     query = instruction + prompt["text"] + " "
     allowlist = TOOL_SET.get(tool, "")
-    cmd = build_cmd(cfg["model"], query, allowlist, backend=backend)
+    cmd = build_cmd(cfg["model"], query, allowlist, backend=backend,
+                    provider=cfg.get("provider"))
     print(f"  [{tool_id} / {prompt['id']}] running ...", flush=True)
     if dry_run:
         print("    " + shlex.join(cmd))
+        _cleanup_models_json()
         return None
 
     t0 = time.monotonic()
@@ -122,6 +231,10 @@ def run_cell(cfg, tool, prompt, tool_version, version_source, run_ts,
     except subprocess.TimeoutExpired:
         r = None
     wall = time.monotonic() - t0
+
+    # Remove any host-side temp models.json handed to docker runs (only after
+    # the container has finished so the mount never dangles).
+    _cleanup_models_json()
 
     if r is None or (r.stdout or "").strip() == "":
         row = _empty_row(tool, v, version_source, prompt, run_ts, None, wall)

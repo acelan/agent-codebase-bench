@@ -81,8 +81,21 @@ def main():
         cfg["provider"] = args.provider
     if not cfg.get("model"):
         raise SystemExit("no model: pass --model-preset <name> or --model <provider/model>")
+    # PI_PROVIDER in the environment (docker/.env) picks the provider when
+    # multiple are configured at once (e.g. both OPENROUTER_API_KEY and
+    # OLLAMA_BASE_URL are set). CLI --provider/--model-preset win over it.
+    if not args.provider and not args.model_preset:
+        env_provider = os.environ.get("PI_PROVIDER", "").strip().lower()
+        if env_provider:
+            cfg["provider"] = env_provider
     cfg.setdefault("provider", "openrouter")
     cfg.setdefault("kernel_dir", "/workspace/linux")
+
+    if cfg["provider"] == "ollama":
+        if not os.environ.get("OLLAMA_BASE_URL"):
+            print("[ollama] provider defaults to OLLAMA_BASE_URL "
+                  "http://127.0.0.1:11434/v1; set OLLAMA_BASE_URL in "
+                  "docker/.env for a remote endpoint", file=sys.stderr)
 
     if args.ensure_index:
         print("[ensure-index] pi-parity not implemented; index the kernel "
@@ -98,6 +111,10 @@ def main():
     prompts = [p for p in cfg["prompts"] if not prompt_ids or p["id"] in prompt_ids]
 
     flat_model = cfg["model"].rsplit("/", 1)[-1]
+    if cfg.get("provider") == "ollama":
+        # Ollama model ids carry a :tag; keep the artifacts dir name friendly
+        # (artifacts/qwen3-coder-30b-ollama/ instead of ...:30b-ollama/).
+        flat_model = flat_model.replace(":", "-")
     model_root = os.path.join(base_dir, f"{flat_model}-{cfg['provider']}")
 
     if not args.aggregate_only:

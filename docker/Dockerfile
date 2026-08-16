@@ -81,6 +81,14 @@ COPY docker/index-cache.sh docker/prepare-index.sh /opt/pi-bench/
 RUN chmod +x /opt/pi-bench/index-cache.sh /opt/pi-bench/prepare-index.sh \
  && ln -s /opt/pi-bench/index-cache.sh /usr/local/bin/pi-bench-index
 
+# --- ollama provider config generator ---------------------------------------
+# pi has no built-in ollama discovery; the provider (baseUrl + model list) must
+# be declared in ~/.pi/agent/models.json. ollama-models.sh writes that file
+# from OLLAMA_BASE_URL / PI_MODEL env so the harness (native or docker) can
+# point pi at a local/remote ollama server without hand-editing config.
+COPY docker/ollama-models.sh /usr/local/bin/pi-ollama-models
+RUN chmod +x /usr/local/bin/pi-ollama-models
+
 # --- rtk (Rust Token Killer), pinned to a release binary -------------------
 # Single static musl binary: wraps bash output (rtk grep / rtk read / rtk rg)
 # to cut the tokens the agent reads. Its version is part of the tool id.
