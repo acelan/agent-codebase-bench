@@ -219,7 +219,7 @@ default context, `supportsDeveloperRole=false` for the OpenAI-compatible API).
   `bench_pi.py`, `docs/pi-migration.md`.
 - **Verification baseline (proven this session):** docker image
   `agent-codebase-bench:latest` builds; `pi --version` in-container = 0.84.1;
-  kernel pinned to v7.0 (shallow clone, `git describe` = v7.0); a full grep cell
+  kernel pinned to v7.0 (full clone, `git describe` = v7.0); a full grep cell
   through `bench_pi.py --backend docker` produced usage
   `total=117482 in=14817 out=7945 cache=94720 reas=3275 api_calls=11 #toolcalls=34
   cost=0.00447 wall=40.2s` and rendered report.md/run.json/report.html.

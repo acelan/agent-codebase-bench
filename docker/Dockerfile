@@ -61,15 +61,19 @@ RUN python3 -m venv /opt/repowise-venv \
  && ln -s /opt/repowise-venv/bin/repowise /usr/local/bin/repowise
 
 # --- clone the Linux kernel at build time (self-contained image) ----------
-# Shallow clone of the v7.0 tag, pinned to match the benchmark prompts (they
+# Full clone of the v7.0 tag, pinned to match the benchmark prompts (they
 # reference 6.17/7.0-era i915_drv.c registration and usb/typec). The bench
-# queries the *working tree* (grep + each index tool), so a shallow checkout
-# is all that is needed. Override the tag/repo with --build-arg if needed.
+# queries the *working tree* (grep + each index tool), but we deliberately
+# keep the FULL git history (no --depth 1 / shallow clone) so that git log,
+# git blame and backport workflows inside the container work against the
+# complete upstream history. Override the tag/repo with --build-arg if needed.
+# Note: a full torvalds/linux clone adds ~4-5 GB to the image; the clone
+# layer is cached by Docker across rebuilds as long as these ARGs don't change.
 ARG KERNEL_REPO=https://github.com/torvalds/linux.git
 ARG KERNEL_TAG=v7.0
-RUN git clone --depth 1 --branch "$KERNEL_TAG" "$KERNEL_REPO" "$KERNEL_DIR" \
+RUN git clone --branch "$KERNEL_TAG" "$KERNEL_REPO" "$KERNEL_DIR" \
  || { echo "tag clone failed; retrying master"; \
-      git clone --depth 1 "$KERNEL_REPO" "$KERNEL_DIR"; }
+      git clone "$KERNEL_REPO" "$KERNEL_DIR"; }
 
 # Index cache profile. Change this when a tool version or index recipe
 # changes; the old cache remains available under artifacts/indexes/.
