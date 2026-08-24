@@ -83,6 +83,9 @@ artifacts/result-summary.json                        cached LLM report analysis 
 set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, optional PI_SUMMARY_MODEL, REPOWISE_*, OLLAMA_*
 
 # build the single image (does not build indexes)
+# NOTE: docker/*.sh are COPIED into the image at build time (Dockerfile).
+# After editing any docker/ script you MUST rebuild before the change takes
+# effect in a container — the pi-bench-index run below does NOT re-read them.
 docker build -t agent-codebase-bench -f docker/Dockerfile .
 
 # build missing indexes into the host-mounted artifacts/indexes directory

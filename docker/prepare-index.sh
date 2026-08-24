@@ -42,20 +42,25 @@ if [ ! -f "$INDEX_CACHE_DIR/.graft.complete" ]; then
 fi
 
 if [ ! -f "$INDEX_CACHE_DIR/.codebase-memory.complete" ]; then
-    if [ ! -d "$INDEX_CACHE_DIR/codebase-memory-mcp" ] || \
-       [ -L "$INDEX_CACHE_DIR/codebase-memory-mcp" ]; then
-        rm -rf "$INDEX_CACHE_DIR/codebase-memory-mcp"
-        mkdir -p "$INDEX_CACHE_DIR/codebase-memory-mcp"
+    # codebase-memory-mcp rejects symlinked cache paths (its coordination
+    # canonicalizes the symlink to the bind-mounted artifacts dir and fails
+    # with "cache-private"), so build into a real on-container dir first,
+    # syncing the finished index back to the host cache rather than
+    # symlinking the build-time path (see index-cache.sh attach fallback).
+    REPO_CACHE=/root/.cache/codebase-memory-mcp
+    mkdir -p /root/.cache "$INDEX_CACHE_DIR/codebase-memory-mcp"
+    if [ -L "$REPO_CACHE" ]; then
+        rm -rf "$REPO_CACHE"
     fi
-    chmod 700 "$INDEX_CACHE_DIR/codebase-memory-mcp"
-    mkdir -p /root/.cache
-    if [ ! -d "/root/.cache/codebase-memory-mcp" ] || \
-       [ -L "/root/.cache/codebase-memory-mcp" ]; then
-        link_target "$INDEX_CACHE_DIR/codebase-memory-mcp" \
-            /root/.cache/codebase-memory-mcp
-    fi
+    [ -d "$REPO_CACHE" ] || mkdir -p "$REPO_CACHE"
+    chmod 700 "$REPO_CACHE"
     echo "=== codebase-memory-mcp (full, offline) ==="
     codebase-memory-mcp cli index_repository --repo-path "$KERNEL_DIR" 2>&1 | tail -5
+    # persist the completed index under the host cache (copy, not link: the
+    # tool refuses symlinked caches). `/.` copies the dir's contents so the
+    # result lands at codebase-memory-mcp/, not codebase-memory-mcp/…/nested.
+    cp -a "$REPO_CACHE"/. "$INDEX_CACHE_DIR/codebase-memory-mcp"
+    chmod -R a+rwX "$INDEX_CACHE_DIR/codebase-memory-mcp"
     touch "$INDEX_CACHE_DIR/.codebase-memory.complete"
 fi
 
