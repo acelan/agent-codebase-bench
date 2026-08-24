@@ -61,12 +61,15 @@ def _stats(values):
     vals = [v for v in values if v is not None]
     if not vals:
         return {"n": 0}
+    # Sample stdev needs >=2 points; a single run has no spread to report.
+    sd = round(statistics.stdev(vals), 4) if len(vals) >= 2 else 0.0
     return {
         "n": len(vals),
         "mean": round(statistics.mean(vals), 4),
         "median": round(statistics.median(vals), 4),
         "min": round(min(vals), 4),
         "max": round(max(vals), 4),
+        "stdev": sd,
     }
 
 
@@ -238,7 +241,7 @@ def _summarize_tool(folder, name, runs):
 def _fmt_stats(s):
     if not s or s.get("n") == 0:
         return "—"
-    return f"{s['mean']:g} (n={s['n']})"
+    return f"{s['mean']:g} (n={s['n']}, sd={s.get('stdev', 0):g})"
 
 
 def _write_report(model_root, summaries):

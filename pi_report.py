@@ -134,10 +134,12 @@ def load_cells(artifacts, instructions=None):
                 # Run count each displayed mean rests on (mirrors summary.json's
                 # per-metric n) so tables can show "mean (n=N)" like report.md.
                 cell_n = {}
+                cell_sd = {}
                 for k, _, _ in BASE_COLS:
                     stats = p.get(k)
                     if isinstance(stats, dict):
                         cell_n[k] = stats.get("n")
+                        cell_sd[k] = stats.get("stdev")
                 yield {
                     "model": model,
                     "model_root": mr,
@@ -148,6 +150,7 @@ def load_cells(artifacts, instructions=None):
                     "prompt_text": _prompt_text(mr, tid, p, instructions),
                     "cells": cells,
                     "cell_n": cell_n,
+                    "cell_sd": cell_sd,
                     "summary": s,
                     "pprompt": p,
                 }
@@ -319,7 +322,7 @@ def _results_summary_html(findings, unavailable=None):
     return "".join(sections)
 
 
-def _cell_html(value, key, best, worst, n=None):
+def _cell_html(value, key, best, worst, n=None, sd=None):
     if value is None:
         return "<td class='num'>—</td>"
     style = ""
@@ -330,7 +333,10 @@ def _cell_html(value, key, best, worst, n=None):
         style = "worst"
     fmt = fmt_num(value)
     if n is not None:
-        fmt += f" <span class='mrk'>(n={n})</span>"
+        mark = f"n={n}"
+        if sd is not None:
+            mark += f", sd={fmt_num(sd)}"
+        fmt += f" <span class='mrk'>({mark})</span>"
     return f"<td class='num {style}'>{fmt}</td>"
 
 
@@ -424,7 +430,8 @@ def _group_html(prompt, rows):
         for key, _, _ in BASE_COLS:
             best, worst = _best_worst(prompt_rows, key)
             tds.append(_cell_html(r["cells"].get(key), key, best, worst,
-                                  (r.get("cell_n") or {}).get(key)))
+                                  (r.get("cell_n") or {}).get(key),
+                                  (r.get("cell_sd") or {}).get(key)))
         trows.append("<tr>" + "".join(tds) + "</tr>")
     h.append("<table class='grp'><thead>" + thead + "</thead><tbody>"
              + "".join(trows) + "</tbody></table>")
