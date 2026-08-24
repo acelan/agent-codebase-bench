@@ -35,8 +35,18 @@ attach_indexes() {
         mkdir -p /root/.cache
         cp -a "$CACHE_DIR/codebase-memory-mcp" \
             "/root/.cache/codebase-memory-mcp"
-        chmod -R a+rwX "/root/.cache/codebase-memory-mcp"
     fi
+    # codebase-memory-mcp's "secure CLI coordination" (cache-private) check
+    # requires the cache dir to be owned by the invoking user (root in this
+    # container). A host bind-mount keeps the HOST uid (e.g. 1000), which
+    # fails that ownership check every time -- not a permission-bits issue,
+    # an ownership one -- and the CLI dies with the exact "cache-private"
+    # error this comment block used to only warn about for the symlink case.
+    # Always normalize ownership here, whether the dir was just copied above
+    # or arrived as a direct host bind-mount (the "recommended" docker run in
+    # README.md / docs/pi-migration.md), so both paths actually work.
+    chown -R root:root "/root/.cache/codebase-memory-mcp"
+    chmod -R u+rwX "/root/.cache/codebase-memory-mcp"
     for sub in drivers/gpu/drm/i915 drivers/usb/typec; do
         [ -d "$KERNEL_DIR/$sub" ] || continue
         name="${sub//\//_}"
