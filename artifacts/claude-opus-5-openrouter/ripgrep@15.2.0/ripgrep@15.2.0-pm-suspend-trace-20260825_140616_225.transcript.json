@@ -1,0 +1,419 @@
+{
+  "session_id": "01a0393e-44cb-7896-b2f8-d452e32aa364",
+  "model": "anthropic/claude-opus-5",
+  "provider": "openrouter",
+  "prompt": "Use ripgrep to do any code related query. Trace the full call chain that reaches i915_pm_suspend from every PCI PM callback in drivers/gpu/drm/i915, then list which of those callers also call i915_pm_runtime_suspend, and show the data flow of dev_priv from i915_drm_suspend down to intel_display_suspend. ",
+  "events": [
+    {
+      "type": "prompt",
+      "id": null,
+      "role": "user",
+      "timestamp": 1787666777367,
+      "token_count": null,
+      "finish_reason": null,
+      "content": "Use ripgrep to do any code related query. Trace the full call chain that reaches i915_pm_suspend from every PCI PM callback in drivers/gpu/drm/i915, then list which of those callers also call i915_pm_runtime_suspend, and show the data flow of dev_priv from i915_drm_suspend down to intel_display_suspend. "
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666777412,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I'll trace this through the i915 driver source.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01T4VCzvRH12kix7KSzmigWZ\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace && ls && rg -n \\\"i915_pm_suspend\\\" --type c -g '!*.h' drivers/gpu/drm/i915 2>/dev/null | head -50\"}}\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_011ahTCBCFkJowSvCRPKw1hJ\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace && ls drivers/gpu/drm/i915 2>/dev/null | head\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01T4VCzvRH12kix7KSzmigWZ",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace && ls && rg -n \"i915_pm_suspend\" --type c -g '!*.h' drivers/gpu/drm/i915 2>/dev/null | head -50"
+          }
+        },
+        {
+          "tool_call_id": "toolu_bdrk_011ahTCBCFkJowSvCRPKw1hJ",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace && ls drivers/gpu/drm/i915 2>/dev/null | head"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666780922,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01T4VCzvRH12kix7KSzmigWZ",
+      "tool_name": "bash",
+      "content": "artifacts\nlinux\n"
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666780922,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_011ahTCBCFkJowSvCRPKw1hJ",
+      "tool_name": "bash",
+      "content": "(no output)"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666780923,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01Gwup9H7VMCMY6z7T1hcaJG\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"i915_pm_suspend\\\" drivers/gpu/drm/i915 | head -50\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01Gwup9H7VMCMY6z7T1hcaJG",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"i915_pm_suspend\" drivers/gpu/drm/i915 | head -50"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666782897,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01Gwup9H7VMCMY6z7T1hcaJG",
+      "tool_name": "bash",
+      "content": "drivers/gpu/drm/i915/i915_driver.c:1392:static int i915_pm_suspend(struct device *kdev)\ndrivers/gpu/drm/i915/i915_driver.c:1407:static int i915_pm_suspend_late(struct device *kdev)\ndrivers/gpu/drm/i915/i915_driver.c:1426:static int i915_pm_suspend_noirq(struct device *kdev)\ndrivers/gpu/drm/i915/i915_driver.c:1719:\t.suspend = i915_pm_suspend,\ndrivers/gpu/drm/i915/i915_driver.c:1720:\t.suspend_late = i915_pm_suspend_late,\ndrivers/gpu/drm/i915/i915_driver.c:1721:\t.suspend_noirq = i915_pm_suspend_noirq,\ndrivers/gpu/drm/i915/i915_driver.c:1745:\t.poweroff = i915_pm_suspend,\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666782899,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_0137imgNy6vrDQw6j4fqAPoG\", \"name\": \"read\", \"arguments\": {\"path\": \"/workspace/linux/drivers/gpu/drm/i915/i915_driver.c\", \"offset\": 1370, \"limit\": 120}}\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_013FH5nSpMKfoRamirhBoetx\", \"name\": \"read\", \"arguments\": {\"path\": \"/workspace/linux/drivers/gpu/drm/i915/i915_driver.c\", \"offset\": 1700, \"limit\": 90}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_0137imgNy6vrDQw6j4fqAPoG",
+          "name": "read",
+          "arguments": {
+            "path": "/workspace/linux/drivers/gpu/drm/i915/i915_driver.c",
+            "offset": 1370,
+            "limit": 120
+          }
+        },
+        {
+          "tool_call_id": "toolu_bdrk_013FH5nSpMKfoRamirhBoetx",
+          "name": "read",
+          "arguments": {
+            "path": "/workspace/linux/drivers/gpu/drm/i915/i915_driver.c",
+            "offset": 1700,
+            "limit": 90
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666786288,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_0137imgNy6vrDQw6j4fqAPoG",
+      "tool_name": "read",
+      "content": "\tret = i915_drm_resume_early(&i915->drm);\n\tif (ret)\n\t\treturn ret;\n\n\treturn i915_drm_resume(&i915->drm);\n}\n\nstatic int i915_pm_prepare(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (!i915) {\n\t\tdev_err(kdev, \"DRM not initialized, aborting suspend.\\n\");\n\t\treturn -ENODEV;\n\t}\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_prepare(&i915->drm);\n}\n\nstatic int i915_pm_suspend(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (!i915) {\n\t\tdev_err(kdev, \"DRM not initialized, aborting suspend.\\n\");\n\t\treturn -ENODEV;\n\t}\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_suspend(&i915->drm);\n}\n\nstatic int i915_pm_suspend_late(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\t/*\n\t * We have a suspend ordering issue with the snd-hda driver also\n\t * requiring our device to be power up. Due to the lack of a\n\t * parent/child relationship we currently solve this with an late\n\t * suspend hook.\n\t *\n\t * FIXME: This should be solved with a special hdmi sink device or\n\t * similar so that power domains can be employed.\n\t */\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_suspend_late(&i915->drm, false);\n}\n\nstatic int i915_pm_suspend_noirq(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_suspend_noirq(&i915->drm, false);\n}\n\nstatic int i915_pm_poweroff_late(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_suspend_late(&i915->drm, true);\n}\n\nstatic int i915_pm_poweroff_noirq(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_suspend_noirq(&i915->drm, true);\n}\n\nstatic int i915_pm_resume_early(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_resume_early(&i915->drm);\n}\n\nstatic int i915_pm_resume(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\treturn i915_drm_resume(&i915->drm);\n}\n\nstatic void i915_pm_complete(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn;\n\n\ti915_drm_complete(&i915->drm);\n}\n\n/* freeze: before creating the hibernation_image */\nstatic int i915_pm_freeze(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\n[396 more lines in file. Use offset=1490 to continue.]"
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666786289,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_013FH5nSpMKfoRamirhBoetx",
+      "tool_name": "read",
+      "content": "\tskl_watermark_ipc_update(display);\n\n\tenable_rpm_wakeref_asserts(rpm);\n\n\tif (ret)\n\t\tdrm_err(&dev_priv->drm,\n\t\t\t\"Runtime resume failed, disabling it (%d)\\n\", ret);\n\telse\n\t\tdrm_dbg(&dev_priv->drm, \"Device resumed\\n\");\n\n\treturn ret;\n}\n\nconst struct dev_pm_ops i915_pm_ops = {\n\t/*\n\t * S0ix (via system suspend) and S3 event handlers [PMSG_SUSPEND,\n\t * PMSG_RESUME]\n\t */\n\t.prepare = i915_pm_prepare,\n\t.suspend = i915_pm_suspend,\n\t.suspend_late = i915_pm_suspend_late,\n\t.suspend_noirq = i915_pm_suspend_noirq,\n\t.resume_early = i915_pm_resume_early,\n\t.resume = i915_pm_resume,\n\t.complete = i915_pm_complete,\n\n\t/*\n\t * S4 event handlers\n\t * @freeze*   : called (1) before creating the\n\t *              hibernation image [PMSG_FREEZE] and\n\t *              (2) after rebooting, before restoring\n\t *              the image [PMSG_QUIESCE]\n\t * @thaw*     : called (1) after creating the hibernation\n\t *              image, before writing it [PMSG_THAW]\n\t *              and (2) after failing to create or\n\t *              restore the image [PMSG_RECOVER]\n\t * @poweroff* : called after writing the hibernation\n\t *              image, before rebooting [PMSG_HIBERNATE]\n\t * @restore*  : called after rebooting and restoring the\n\t *              hibernation image [PMSG_RESTORE]\n\t */\n\t.freeze = i915_pm_freeze,\n\t.freeze_late = i915_pm_freeze_late,\n\t.thaw_early = i915_pm_thaw_early,\n\t.thaw = i915_pm_thaw,\n\t.poweroff = i915_pm_suspend,\n\t.poweroff_late = i915_pm_poweroff_late,\n\t.poweroff_noirq = i915_pm_poweroff_noirq,\n\t.restore_early = i915_pm_restore_early,\n\t.restore = i915_pm_restore,\n\n\t/* S0ix (via runtime suspend) event handlers */\n\t.runtime_suspend = intel_runtime_suspend,\n\t.runtime_resume = intel_runtime_resume,\n};\n\nstatic const struct file_operations i915_driver_fops = {\n\t.owner = THIS_MODULE,\n\t.open = drm_open,\n\t.release = drm_release_noglobal,\n\t.unlocked_ioctl = drm_ioctl,\n\t.mmap = i915_gem_mmap,\n\t.poll = drm_poll,\n\t.read = drm_read,\n\t.compat_ioctl = i915_ioc32_compat_ioctl,\n\t.llseek = noop_llseek,\n#ifdef CONFIG_PROC_FS\n\t.show_fdinfo = drm_show_fdinfo,\n#endif\n\t.fop_flags = FOP_UNSIGNED_OFFSET,\n};\n\nstatic int\ni915_gem_reject_pin_ioctl(struct drm_device *dev, void *data,\n\t\t\t  struct drm_file *file)\n{\n\treturn -ENODEV;\n}\n\nstatic const struct drm_ioctl_desc i915_ioctls[] = {\n\tDRM_IOCTL_DEF_DRV(I915_INIT, drm_noop, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),\n\tDRM_IOCTL_DEF_DRV(I915_FLUSH, drm_noop, DRM_AUTH),\n\tDRM_IOCTL_DEF_DRV(I915_FLIP, drm_noop, DRM_AUTH),\n\tDRM_IOCTL_DEF_DRV(I915_BATCHBUFFER, drm_noop, DRM_AUTH),\n\tDRM_IOCTL_DEF_DRV(I915_IRQ_EMIT, drm_noop, DRM_AUTH),\n\tDRM_IOCTL_DEF_DRV(I915_IRQ_WAIT, drm_noop, DRM_AUTH),\n\tDRM_IOCTL_DEF_DRV(I915_GETPARAM, i915_getparam_ioctl, DRM_RENDER_ALLOW),\n\tDRM_IOCTL_DEF_DRV(I915_SETPARAM, drm_noop, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),\n\tDRM_IOCTL_DEF_DRV(I915_ALLOC, drm_noop, DRM_AUTH),\n\tDRM_IOCTL_DEF_DRV(I915_FREE, drm_noop, DRM_AUTH),\n\n[96 more lines in file. Use offset=1790 to continue.]"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666786290,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I need to verify the actual function names in this codebase since i915_pm_runtime_suspend appears to be named intel_runtime_suspend instead. Let me trace through the freeze path to see how i915_pm_freeze calls into i915_drm_suspend, which then goes through intel_display_driver_suspend and intel_display_suspend.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01Xr8NJ3kDDVeGRfEyMtxysx\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"i915_pm_runtime_suspend|intel_runtime_suspend\\\" drivers/gpu/drm/i915 | head; echo ---; sed -n 1485,1520p drivers/gpu/drm/i915/i915_driver.c\"}}\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01XxgYg8sb4veTPuGo82UxiJ\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"static int i915_drm_suspend\\\\b\\\" -A 80 drivers/gpu/drm/i915/i915_driver.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01Xr8NJ3kDDVeGRfEyMtxysx",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"i915_pm_runtime_suspend|intel_runtime_suspend\" drivers/gpu/drm/i915 | head; echo ---; sed -n 1485,1520p drivers/gpu/drm/i915/i915_driver.c"
+          }
+        },
+        {
+          "tool_call_id": "toolu_bdrk_01XxgYg8sb4veTPuGo82UxiJ",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"static int i915_drm_suspend\\b\" -A 80 drivers/gpu/drm/i915/i915_driver.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666792745,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01Xr8NJ3kDDVeGRfEyMtxysx",
+      "tool_name": "bash",
+      "content": "drivers/gpu/drm/i915/intel_uncore.c:2319:\t\t * The notifier is unregistered during intel_runtime_suspend(),\ndrivers/gpu/drm/i915/i915_driver.c:1545:static int intel_runtime_suspend(struct device *kdev)\ndrivers/gpu/drm/i915/i915_driver.c:1752:\t.runtime_suspend = intel_runtime_suspend,\n---\n\n/* freeze: before creating the hibernation_image */\nstatic int i915_pm_freeze(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\tint ret;\n\n\tif (i915->drm.switch_power_state != DRM_SWITCH_POWER_OFF) {\n\t\tret = i915_drm_suspend(&i915->drm);\n\t\tif (ret)\n\t\t\treturn ret;\n\t}\n\n\tret = i915_gem_freeze(i915);\n\tif (ret)\n\t\treturn ret;\n\n\treturn 0;\n}\n\nstatic int i915_pm_freeze_late(struct device *kdev)\n{\n\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n\tint ret;\n\n\tif (i915->drm.switch_power_state != DRM_SWITCH_POWER_OFF) {\n\t\tret = i915_drm_suspend_late(&i915->drm, true);\n\t\tif (ret)\n\t\t\treturn ret;\n\t}\n\n\tret = i915_gem_freeze_late(i915);\n\tif (ret)\n\t\treturn ret;\n\n\treturn 0;\n"
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666792745,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01XxgYg8sb4veTPuGo82UxiJ",
+      "tool_name": "bash",
+      "content": "1103:static int i915_drm_suspend(struct drm_device *dev)\n1104-{\n1105-\tstruct drm_i915_private *dev_priv = to_i915(dev);\n1106-\tstruct intel_display *display = dev_priv->display;\n1107-\tpci_power_t opregion_target_state;\n1108-\n1109-\tdisable_rpm_wakeref_asserts(&dev_priv->runtime_pm);\n1110-\n1111-\t/* We do a lot of poking in a lot of registers, make sure they work\n1112-\t * properly. */\n1113-\tintel_power_domains_disable(display);\n1114-\tdrm_client_dev_suspend(dev);\n1115-\tif (intel_display_device_present(display)) {\n1116-\t\tdrm_kms_helper_poll_disable(dev);\n1117-\t\tintel_display_driver_disable_user_access(display);\n1118-\t}\n1119-\n1120-\tintel_display_driver_suspend(display);\n1121-\n1122-\tintel_irq_suspend(dev_priv);\n1123-\tintel_hpd_cancel_work(display);\n1124-\n1125-\tif (intel_display_device_present(display))\n1126-\t\tintel_display_driver_suspend_access(display);\n1127-\n1128-\tintel_encoder_suspend_all(display);\n1129-\n1130-\t/* Must be called before GGTT is suspended. */\n1131-\tintel_dpt_suspend(display);\n1132-\ti915_ggtt_suspend(to_gt(dev_priv)->ggtt);\n1133-\n1134-\ti9xx_display_sr_save(display);\n1135-\n1136-\topregion_target_state = suspend_to_idle(dev_priv) ? PCI_D1 : PCI_D3cold;\n1137-\tintel_opregion_suspend(display, opregion_target_state);\n1138-\n1139-\tdev_priv->suspend_count++;\n1140-\n1141-\tintel_dmc_suspend(display);\n1142-\n1143-\tenable_rpm_wakeref_asserts(&dev_priv->runtime_pm);\n1144-\n1145-\ti915_gem_drain_freed_objects(dev_priv);\n1146-\n1147-\treturn 0;\n1148-}\n1149-\n1150-static int i915_drm_suspend_late(struct drm_device *dev, bool hibernation)\n1151-{\n1152-\tstruct drm_i915_private *dev_priv = to_i915(dev);\n1153-\tstruct intel_display *display = dev_priv->display;\n1154-\tstruct intel_runtime_pm *rpm = &dev_priv->runtime_pm;\n1155-\tstruct intel_gt *gt;\n1156-\tint ret, i;\n1157-\tbool s2idle = !hibernation && suspend_to_idle(dev_priv);\n1158-\n1159-\tdisable_rpm_wakeref_asserts(rpm);\n1160-\n1161-\tintel_pxp_suspend(dev_priv->pxp);\n1162-\n1163-\ti915_gem_suspend_late(dev_priv);\n1164-\n1165-\tfor_each_gt(gt, dev_priv, i)\n1166-\t\tintel_uncore_suspend(gt->uncore);\n1167-\n1168-\tintel_display_power_suspend_late(display, s2idle);\n1169-\n1170-\tret = vlv_suspend_complete(dev_priv);\n1171-\tif (ret) {\n1172-\t\tdrm_err(&dev_priv->drm, \"Suspend complete failed: %d\\n\", ret);\n1173-\t\tintel_display_power_resume_early(display);\n1174-\t}\n1175-\n1176-\tenable_rpm_wakeref_asserts(rpm);\n1177-\n1178-\tif (!dev_priv->uncore.user_forcewake_count)\n1179-\t\tintel_runtime_pm_driver_release(rpm);\n1180-\n1181-\treturn ret;\n1182-}\n1183-\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666792746,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "Now I'm tracing the execution path from intel_display_driver_suspend down to intel_display_suspend.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_019sMRP3pWeJFc24Fajqq1tK\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"void intel_display_driver_suspend\\\" -A 30 drivers/gpu/drm/i915/display/intel_display_driver.c; echo ===; rg -n \\\"void intel_display_suspend\\\" -A 30 drivers/gpu/drm/i915/display/intel_display.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_019sMRP3pWeJFc24Fajqq1tK",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"void intel_display_driver_suspend\" -A 30 drivers/gpu/drm/i915/display/intel_display_driver.c; echo ===; rg -n \"void intel_display_suspend\" -A 30 drivers/gpu/drm/i915/display/intel_display.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666796385,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_019sMRP3pWeJFc24Fajqq1tK",
+      "tool_name": "bash",
+      "content": "388:void intel_display_driver_suspend_access(struct intel_display *display)\n389-{\n390-\tset_display_access(display, false, NULL);\n391-}\n392-\n393-/**\n394- * intel_display_driver_resume_access - Resume display HW access for the resume thread\n395- * @display: display device instance\n396- *\n397- * Enable the display HW access for the current resume thread, keeping the\n398- * access disabled for all other (user) threads. Examples for such accesses\n399- * are modeset commits and connector probing. The resume thread should only\n400- * perform HW init programming (as the restoring modeset). This function\n401- * should be followed by calling intel_display_driver_enable_user_access(),\n402- * after completing the HW init programming steps.\n403- *\n404- * This function should be called during system resume before starting the HW\n405- * init steps.\n406- */\n407-void intel_display_driver_resume_access(struct intel_display *display)\n408-{\n409-\tset_display_access(display, false, current);\n410-}\n411-\n412-/**\n413- * intel_display_driver_check_access - Check if the current thread has disaplay HW access\n414- * @display: display device instance\n415- *\n416- * Check whether the current thread has display HW access, print a debug\n417- * message if it doesn't. Such accesses are modeset commits and connector\n418- * probing. If the function returns %false any HW access should be prevented.\n===\n\n\nCommand exited with code 1"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666796385,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01G3cK73tMEQV8J3HJx7as7Y\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"intel_display_driver_suspend\\\\b\\\" -A 25 drivers/gpu/drm/i915/display/intel_display_driver.c | head -60; echo ===; rg -rn \\\"intel_display_suspend\\\" drivers/gpu/drm/i915/display/*.c drivers/gpu/drm/i915/display/*.h | head -20\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01G3cK73tMEQV8J3HJx7as7Y",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"intel_display_driver_suspend\\b\" -A 25 drivers/gpu/drm/i915/display/intel_display_driver.c | head -60; echo ===; rg -rn \"intel_display_suspend\" drivers/gpu/drm/i915/display/*.c drivers/gpu/drm/i915/display/*.h | head -20"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666799117,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01G3cK73tMEQV8J3HJx7as7Y",
+      "tool_name": "bash",
+      "content": "684:int intel_display_driver_suspend(struct intel_display *display)\n685-{\n686-\tstruct drm_atomic_state *state;\n687-\tint ret;\n688-\n689-\tif (!HAS_DISPLAY(display))\n690-\t\treturn 0;\n691-\n692-\tstate = drm_atomic_helper_suspend(display->drm);\n693-\tret = PTR_ERR_OR_ZERO(state);\n694-\tif (ret)\n695-\t\tdrm_err(display->drm, \"Suspending crtc's failed with %i\\n\",\n696-\t\t\tret);\n697-\telse\n698-\t\tdisplay->restore.modeset_state = state;\n699-\n700-\t/* ensure all DPT VMAs have been unpinned for intel_dpt_suspend() */\n701-\tflush_workqueue(display->wq.cleanup);\n702-\n703-\tintel_dp_mst_suspend(display);\n704-\n705-\treturn ret;\n706-}\n707-\n708-int\n709-__intel_display_driver_resume(struct intel_display *display,\n===\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666799119,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I need to track down whether `intel_display_suspend` exists in this version of the codebase, and also verify the correct naming for `i915_pm_runtime_suspend` — it might be `intel_runtime_suspend` instead. I should also check the `to_i915` macro and how the display pointer and `dev_priv` flow work through the code.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01FABTLPeNqRJMeduNic9mDa\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"intel_display_suspend|i915_pm_runtime_suspend\\\" drivers/gpu/drm/ | head; echo \\\"exit=$?\\\"; git log --oneline -1\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01FABTLPeNqRJMeduNic9mDa",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"intel_display_suspend|i915_pm_runtime_suspend\" drivers/gpu/drm/ | head; echo \"exit=$?\"; git log --oneline -1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666803769,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01FABTLPeNqRJMeduNic9mDa",
+      "tool_name": "bash",
+      "content": "exit=0\n028ef9c96e96 Linux 7.0\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666803771,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The functions the user mentioned don't actually exist in this codebase—they were renamed in earlier versions. `i915_pm_runtime_suspend` became `intel_runtime_suspend` and `intel_display_suspend` became `intel_display_driver_suspend`. I need to correct the premise and trace the actual call chain through the PCI PM callbacks to see which ones actually invoke `i915_drm_suspend`.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01UXvJEhD4HxXTFfXUYXDyJ6\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"i915_drm_suspend\\\\(\\\" drivers/gpu/drm/i915/; echo ===; rg -n \\\"intel_display_driver_suspend\\\\(\\\" drivers/gpu/drm/i915/\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01UXvJEhD4HxXTFfXUYXDyJ6",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"i915_drm_suspend\\(\" drivers/gpu/drm/i915/; echo ===; rg -n \"intel_display_driver_suspend\\(\" drivers/gpu/drm/i915/"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666808237,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01UXvJEhD4HxXTFfXUYXDyJ6",
+      "tool_name": "bash",
+      "content": "drivers/gpu/drm/i915/i915_driver.c:1103:static int i915_drm_suspend(struct drm_device *dev)\ndrivers/gpu/drm/i915/i915_driver.c:1223:\terror = i915_drm_suspend(&i915->drm);\ndrivers/gpu/drm/i915/i915_driver.c:1404:\treturn i915_drm_suspend(&i915->drm);\ndrivers/gpu/drm/i915/i915_driver.c:1493:\t\tret = i915_drm_suspend(&i915->drm);\n===\ndrivers/gpu/drm/i915/i915_driver.c:1095:\t * NB intel_display_driver_suspend() may issue new requests after we've\ndrivers/gpu/drm/i915/i915_driver.c:1120:\tintel_display_driver_suspend(display);\ndrivers/gpu/drm/i915/display/intel_display_driver.c:684:int intel_display_driver_suspend(struct intel_display *display)\ndrivers/gpu/drm/i915/display/intel_display_driver.h:27:int intel_display_driver_suspend(struct intel_display *display);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666808238,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01NqHppca8SoK1mZZh95suP6\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && sed -n 1210,1235p drivers/gpu/drm/i915/i915_driver.c; echo ===; rg -n \\\"i915_driver_suspend_switcheroo\\\" drivers/gpu/drm/i915/; echo ===; sed -n 1545,1570p drivers/gpu/drm/i915/i915_driver.c; echo ===; rg -n \\\"display = |display;\\\" drivers/gpu/drm/i915/i915_drv.h | head\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01NqHppca8SoK1mZZh95suP6",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && sed -n 1210,1235p drivers/gpu/drm/i915/i915_driver.c; echo ===; rg -n \"i915_driver_suspend_switcheroo\" drivers/gpu/drm/i915/; echo ===; sed -n 1545,1570p drivers/gpu/drm/i915/i915_driver.c; echo ===; rg -n \"display = |display;\" drivers/gpu/drm/i915/i915_drv.h | head"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666811734,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01NqHppca8SoK1mZZh95suP6",
+      "tool_name": "bash",
+      "content": "int i915_driver_suspend_switcheroo(struct drm_i915_private *i915,\n\t\t\t\t   pm_message_t state)\n{\n\tstruct pci_dev *pdev = to_pci_dev(i915->drm.dev);\n\tint error;\n\n\tif (drm_WARN_ON_ONCE(&i915->drm, state.event != PM_EVENT_SUSPEND &&\n\t\t\t     state.event != PM_EVENT_FREEZE))\n\t\treturn -EINVAL;\n\n\tif (i915->drm.switch_power_state == DRM_SWITCH_POWER_OFF)\n\t\treturn 0;\n\n\terror = i915_drm_suspend(&i915->drm);\n\tif (error)\n\t\treturn error;\n\n\terror = i915_drm_suspend_late(&i915->drm, false);\n\tif (error)\n\t\treturn error;\n\n\tpci_save_state(pdev);\n\tpci_set_power_state(pdev, PCI_D3hot);\n\n\treturn 0;\n}\n===\ndrivers/gpu/drm/i915/i915_driver.h:27:int i915_driver_suspend_switcheroo(struct drm_i915_private *i915, pm_message_t state);\ndrivers/gpu/drm/i915/i915_switcheroo.c:42:\t\ti915_driver_suspend_switcheroo(i915, pmm);\ndrivers/gpu/drm/i915/i915_driver.c:1210:int i915_driver_suspend_switcheroo(struct drm_i915_private *i915,\n===\nstatic int intel_runtime_suspend(struct device *kdev)\n{\n\tstruct drm_i915_private *dev_priv = kdev_to_i915(kdev);\n\tstruct intel_display *display = dev_priv->display;\n\tstruct intel_runtime_pm *rpm = &dev_priv->runtime_pm;\n\tstruct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);\n\tstruct pci_dev *root_pdev;\n\tstruct intel_gt *gt;\n\tint ret, i;\n\n\tif (drm_WARN_ON_ONCE(&dev_priv->drm, !HAS_RUNTIME_PM(dev_priv)))\n\t\treturn -ENODEV;\n\n\tdrm_dbg(&dev_priv->drm, \"Suspending device\\n\");\n\n\tdisable_rpm_wakeref_asserts(rpm);\n\n\t/*\n\t * We are safe here against re-faults, since the fault handler takes\n\t * an RPM reference.\n\t */\n\ti915_gem_runtime_suspend(dev_priv);\n\n\tintel_pxp_runtime_suspend(dev_priv->pxp);\n\n\tfor_each_gt(gt, dev_priv, i)\n===\n64:struct intel_display;\n172:\tstruct intel_display *display;\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666811735,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I need to be careful about the API differences in this version—i915_pm_runtime_suspend and intel_display_suspend don't exist here, so I should use intel_runtime_suspend and intel_display_driver_suspend instead. I should also verify what kdev_to_i915 does in this context.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01UcE73MKgpSkDnWjgH5YyVQ\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"kdev_to_i915|#define to_i915\\\" drivers/gpu/drm/i915/i915_drv.h drivers/gpu/drm/i915/i915_driver.c | head\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01UcE73MKgpSkDnWjgH5YyVQ",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"kdev_to_i915|#define to_i915\" drivers/gpu/drm/i915/i915_drv.h drivers/gpu/drm/i915/i915_driver.c | head"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666815564,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01UcE73MKgpSkDnWjgH5YyVQ",
+      "tool_name": "bash",
+      "content": "drivers/gpu/drm/i915/i915_driver.c:1379:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1394:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1409:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1428:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1438:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1448:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1458:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1468:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1478:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\ndrivers/gpu/drm/i915/i915_driver.c:1489:\tstruct drm_i915_private *i915 = kdev_to_i915(kdev);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666815565,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_018iBUe5TPx7fmNoqfLoLMUc\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"kdev_to_i915\\\" drivers/gpu/drm/i915/i915_drv.h drivers/gpu/drm/i915/*.h | head\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_018iBUe5TPx7fmNoqfLoLMUc",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"kdev_to_i915\" drivers/gpu/drm/i915/i915_drv.h drivers/gpu/drm/i915/*.h | head"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787666817900,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_018iBUe5TPx7fmNoqfLoLMUc",
+      "tool_name": "bash",
+      "content": "drivers/gpu/drm/i915/i915_drv.h:328:static inline struct drm_i915_private *kdev_to_i915(struct device *kdev)\ndrivers/gpu/drm/i915/i915_drv.h:328:static inline struct drm_i915_private *kdev_to_i915(struct device *kdev)\n"
+    },
+    {
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787666817901,
+      "token_count": null,
+      "finish_reason": "stop",
+      "type": "final_answer",
+      "content": "The question assumes function names that have changed in the codebase—i915_pm_runtime_suspend is actually intel_runtime_suspend, and intel_display_suspend has been renamed to intel_display_driver_suspend. I should clarify these corrections rather than answer based on the incorrect names.\n## Premise corrections first\n\nTwo names in your question don't exist in this tree (Linux 7.0, `028ef9c96e96`):\n\n- **`i915_pm_runtime_suspend`** — no such symbol. The runtime-PM suspend callback is **`intel_runtime_suspend`** (`i915_driver.c:1545`), installed as `i915_pm_ops.runtime_suspend` (`i915_driver.c:1752`).\n- **`intel_display_suspend`** — no such symbol. The equivalent is **`intel_display_driver_suspend`** (`display/intel_display_driver.c:684`), called from `i915_drm_suspend` at `i915_driver.c:1120`.\n\n`rg -n \"i915_pm_runtime_suspend|intel_display_suspend\" drivers/gpu/drm/` returns nothing.\n\n## Call chains reaching `i915_pm_suspend`\n\n`i915_pm_suspend` (`i915_driver.c:1392`) is itself a PM callback, not something called from other callbacks. It is referenced exactly twice, both as function pointers in `const struct dev_pm_ops i915_pm_ops` (`i915_driver.c:1718`):\n\n```\ni915_pm_ops.suspend   = i915_pm_suspend   (i915_driver.c:1719)   <- PMSG_SUSPEND (S0ix/S3)\ni915_pm_ops.poweroff  = i915_pm_suspend   (i915_driver.c:1745)   <- PMSG_HIBERNATE (S4)\n```\n\nSo the only \"callers\" are the PM core dispatching through `dev_pm_ops`. Downstream:\n\n```\n[PM core] .suspend / .poweroff\n  └─ i915_pm_suspend(kdev)                        i915_driver.c:1392\n       ├─ kdev_to_i915(kdev)                      i915_drv.h:328\n       ├─ guard: drm.switch_power_state == DRM_SWITCH_POWER_OFF -> return 0\n       └─ i915_drm_suspend(&i915->drm)            i915_driver.c:1103\n```\n\n`i915_drm_suspend` has three call sites (no others reach it):\n\n| Caller | Site | Entry point |\n|---|---|---|\n| `i915_pm_suspend` | `i915_driver.c:1404` | `.suspend`, `.poweroff` |\n| `i915_pm_freeze` | `i915_driver.c:1493` | `.freeze` (S4 image creation) |\n| `i915_driver_suspend_switcheroo` | `i915_driver.c:1223` | vga_switcheroo, via `i915_switcheroo.c:42` (not a PCI PM callback) |\n\nThe sibling PCI PM callbacks that do **not** reach `i915_pm_suspend`/`i915_drm_suspend`: `i915_pm_prepare`, `i915_pm_suspend_late`, `i915_pm_suspend_noirq`, `i915_pm_poweroff_late`, `i915_pm_poweroff_noirq`, `i915_pm_freeze_late` (these go to `i915_drm_suspend_late`/`i915_drm_suspend_noirq`, `i915_driver.c:1150`+).\n\n## Which of those callers also call the runtime-suspend path\n\n**None.** `intel_runtime_suspend` is referenced only once outside its definition — as the `.runtime_suspend` pointer at `i915_driver.c:1752`. There is no call edge from `i915_pm_suspend`, `i915_pm_freeze`, or `i915_driver_suspend_switcheroo` into it. The system-suspend and runtime-suspend paths are strictly parallel entry points from the PM core; they only converge on shared leaf helpers, e.g. both call `intel_uncore_suspend()` / `intel_pxp_*suspend()` / `intel_display_power_*` variants, and they interlock through `disable_rpm_wakeref_asserts(&dev_priv->runtime_pm)` on the same `dev_priv->runtime_pm`.\n\n## Data flow of `dev_priv` from `i915_drm_suspend` to `intel_display_driver_suspend`\n\n```c\n/* i915_driver.c:1392 */\ni915_pm_suspend(struct device *kdev)\n    struct drm_i915_private *i915 = kdev_to_i915(kdev);   /* dev_get_drvdata(kdev), i915_drv.h:328 */\n    i915_drm_suspend(&i915->drm);                         /* passed as struct drm_device * */\n\n/* i915_driver.c:1103 */\ni915_drm_suspend(struct drm_device *dev)\n    struct drm_i915_private *dev_priv = to_i915(dev);     /* container_of back to dev_priv */\n    struct intel_display *display   = dev_priv->display;  /* i915_drv.h:172, line 1106 */\n    ...\n    intel_display_driver_suspend(display);                /* line 1120 — only `display` crosses */\n\n/* display/intel_display_driver.c:684 */\nintel_display_driver_suspend(struct intel_display *display)\n    drm_atomic_helper_suspend(display->drm);              /* back to drm_device via display->drm */\n    display->restore.modeset_state = state;\n    flush_workqueue(display->wq.cleanup);\n    intel_dp_mst_suspend(display);\n```\n\nKey point: `dev_priv` is **not** propagated into the display layer. The pointer chain is\n`kdev → (drvdata) → dev_priv → &dev_priv->drm → (to_i915) → dev_priv → dev_priv->display → display->drm`.\n`intel_display_driver_suspend` sees only the opaque `struct intel_display *`, which re-derives the `drm_device` via `display->drm` — this is the deliberate i915↔display decoupling, so the display code never touches `drm_i915_private`.\n\nOther `dev_priv` uses inside `i915_drm_suspend` that stay in the i915 layer: `intel_irq_suspend(dev_priv)` (1122), `to_gt(dev_priv)->ggtt` (1132), `suspend_to_idle(dev_priv)` (1136), `dev_priv->suspend_count++` (1139), `i915_gem_drain_freed_objects(dev_priv)` (1145), and `&dev_priv->runtime_pm` for the wakeref assert bracket (1109/1143)."
+    }
+  ],
+  "aggregate": {
+    "message_count": 27,
+    "tool_call_count": 14,
+    "api_call_count": 12,
+    "input_tokens": 24,
+    "output_tokens": 4553,
+    "cache_read_tokens": 91921,
+    "cache_write_tokens": 10202,
+    "reasoning_tokens": 627,
+    "total_tokens": 106700,
+    "estimated_cost_usd": 0.223668
+  },
+  "summary": {
+    "iterations": 12,
+    "tool_calls": 14
+  }
+}
