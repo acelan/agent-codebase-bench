@@ -1,0 +1,680 @@
+{
+  "session_id": "01a037ba-9341-727a-beea-81560968e761",
+  "model": "anthropic/claude-opus-5",
+  "provider": "openrouter",
+  "prompt": "Use ripgrep to do any code related query. A Dell Pro Precision 5 16 (BIOS 0.4.53) running kernel 6.17.0-1011-oem emits this warning at boot: \"WARNING: CPU: 6 PID: 55 at fs/kernfs/dir.c:1706 kernfs_remove_by_name_ns+0xe9/0xf0 — kernfs: can not remove 'typec', no directory\", raised from typec_unregister_partner -> ucsi_unregister_partner inside ucsi_handle_connector_change (workqueue events, Comm: kworker/6:0). Find the root cause in the kernel source and determine whether an existing fix is already present in this tree or upstream. Identify the exact offending function(s) in drivers/usb/typec (and drivers/usb/typec/ucsi), explain why kernfs_remove_by_name_ns fails with ENOENT ('no directory'), and report the upstream fix (commit/series) if one exists, citing the file:line evidence for each step of the chain. ",
+  "events": [
+    {
+      "type": "prompt",
+      "id": null,
+      "role": "user",
+      "timestamp": 1787641369486,
+      "token_count": null,
+      "finish_reason": null,
+      "content": "Use ripgrep to do any code related query. A Dell Pro Precision 5 16 (BIOS 0.4.53) running kernel 6.17.0-1011-oem emits this warning at boot: \"WARNING: CPU: 6 PID: 55 at fs/kernfs/dir.c:1706 kernfs_remove_by_name_ns+0xe9/0xf0 — kernfs: can not remove 'typec', no directory\", raised from typec_unregister_partner -> ucsi_unregister_partner inside ucsi_handle_connector_change (workqueue events, Comm: kworker/6:0). Find the root cause in the kernel source and determine whether an existing fix is already present in this tree or upstream. Identify the exact offending function(s) in drivers/usb/typec (and drivers/usb/typec/ucsi), explain why kernfs_remove_by_name_ns fails with ENOENT ('no directory'), and report the upstream fix (commit/series) if one exists, citing the file:line evidence for each step of the chain. "
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641369533,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "Let me examine the repository structure.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_011pWFzPKVou2Z7yDvYuLDXM\", \"name\": \"bash\", \"arguments\": {\"command\": \"ls /workspace | head; ls /workspace/drivers/usb/typec 2>/dev/null\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_011pWFzPKVou2Z7yDvYuLDXM",
+          "name": "bash",
+          "arguments": {
+            "command": "ls /workspace | head; ls /workspace/drivers/usb/typec 2>/dev/null"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641372030,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_011pWFzPKVou2Z7yDvYuLDXM",
+      "tool_name": "bash",
+      "content": "artifacts\nlinux\n\n\nCommand exited with code 2"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641372031,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_017xHmAvRgWmshJYG2kkDZFe\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --oneline -3 && ls drivers/usb/typec && ls /workspace/artifacts\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_017xHmAvRgWmshJYG2kkDZFe",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --oneline -3 && ls drivers/usb/typec && ls /workspace/artifacts"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641374147,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_017xHmAvRgWmshJYG2kkDZFe",
+      "tool_name": "bash",
+      "content": "028ef9c96e96 Linux 7.0\n10d97b74e2ee Merge tag 'edac_urgent_for_7.0' of git://git.kernel.org/pub/scm/linux/kernel/git/ras/ras\n35bdc192d829 Merge tag 'wq-for-7.0-rc7-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/tj/wq\nKconfig\nMakefile\naltmodes\nanx7411.c\nbus.c\nbus.h\nclass.c\nclass.h\nhd3ss3220.c\nmode_selection.c\nmux\nmux.c\nmux.h\npd.c\npd.h\nport-mapper.c\nretimer.c\nretimer.h\nrt1719.c\nstusb160x.c\ntcpm\ntipd\nucsi\nwusb3801.c\nclaude-opus-5-20260723-openrouter\nclaude-opus-5-openrouter\ndeepseek-v4-flash-0731-openrouter\nencl.py\nencl2.py\nencl3.py\ngpt-5.6-luna-openrouter\nindexes\nqwen3.8-27b-q8_0-ollama\nreport.html\nresult-summary.json\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641374148,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I'm tracing through the unregistration chain from ucsi_unregister_partner down through typec_unregister_partner to device_unregister, where the error \"can not remove 'typec'\" is likely coming from a failed sysfs_remove_link call when trying to remove the typec symlink from the port-mapper or USB device.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_013QhKz3TZTWViNQyrUuFDwS\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"\\\\\\\"typec\\\\\\\"\\\" drivers/usb/typec drivers/usb/core include/linux/usb* | head -50\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_013QhKz3TZTWViNQyrUuFDwS",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"\\\"typec\\\"\" drivers/usb/typec drivers/usb/core include/linux/usb* | head -50"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641378401,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_013QhKz3TZTWViNQyrUuFDwS",
+      "tool_name": "bash",
+      "content": "drivers/usb/typec/class.c:26:\t.name = \"typec\",\ndrivers/usb/typec/class.c:892:\tret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\ndrivers/usb/typec/class.c:898:\t\tsysfs_remove_link(&dev->kobj, \"typec\");\ndrivers/usb/typec/class.c:909:\tsysfs_remove_link(&dev->kobj, \"typec\");\ndrivers/usb/typec/bus.c:565:\t.name = \"typec\",\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641378403,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01Ka4yBi5Jn1k2vh6MdSmooB\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && sed -n 840,960p drivers/usb/typec/class.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01Ka4yBi5Jn1k2vh6MdSmooB",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && sed -n 840,960p drivers/usb/typec/class.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641381207,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01Ka4yBi5Jn1k2vh6MdSmooB",
+      "tool_name": "bash",
+      "content": "static umode_t typec_partner_attr_is_visible(struct kobject *kobj, struct attribute *attr, int n)\n{\n\tstruct typec_partner *partner = to_typec_partner(kobj_to_dev(kobj));\n\tstruct typec_port *port = to_typec_port(partner->dev.parent);\n\n\tif (attr == &dev_attr_usb_mode.attr) {\n\t\tif (!partner->usb_capability)\n\t\t\treturn 0;\n\t\tif (!port->ops || !port->ops->enter_usb_mode)\n\t\t\treturn 0444;\n\t}\n\n\tif (attr == &dev_attr_number_of_alternate_modes.attr) {\n\t\tif (partner->num_altmodes < 0)\n\t\t\treturn 0;\n\t}\n\n\tif (attr == &dev_attr_type.attr)\n\t\tif (!get_pd_product_type(kobj_to_dev(kobj)))\n\t\t\treturn 0;\n\n\treturn attr->mode;\n}\n\nstatic const struct attribute_group typec_partner_group = {\n\t.is_visible = typec_partner_attr_is_visible,\n\t.attrs = typec_partner_attrs\n};\n\nstatic const struct attribute_group *typec_partner_groups[] = {\n\t&typec_partner_group,\n\tNULL\n};\n\nstatic void typec_partner_release(struct device *dev)\n{\n\tstruct typec_partner *partner = to_typec_partner(dev);\n\n\tida_destroy(&partner->mode_ids);\n\tkfree(partner);\n}\n\nconst struct device_type typec_partner_dev_type = {\n\t.name = \"typec_partner\",\n\t.groups = typec_partner_groups,\n\t.release = typec_partner_release,\n};\n\nstatic void typec_partner_link_device(struct typec_partner *partner, struct device *dev)\n{\n\tint ret;\n\n\tret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n\tif (ret)\n\t\treturn;\n\n\tret = sysfs_create_link(&partner->dev.kobj, &dev->kobj, dev_name(dev));\n\tif (ret) {\n\t\tsysfs_remove_link(&dev->kobj, \"typec\");\n\t\treturn;\n\t}\n\n\tif (partner->attach)\n\t\tpartner->attach(partner, dev);\n}\n\nstatic void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");\n\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n\n/**\n * typec_partner_set_identity - Report result from Discover Identity command\n * @partner: The partner updated identity values\n *\n * This routine is used to report that the result of Discover Identity USB power\n * delivery command has become available.\n */\nint typec_partner_set_identity(struct typec_partner *partner)\n{\n\tu8 usb_capability = partner->usb_capability;\n\tstruct device *dev = &partner->dev;\n\tstruct usb_pd_identity *id;\n\n\tid = get_pd_identity(dev);\n\tif (!id)\n\t\treturn -EINVAL;\n\n\tif (to_typec_port(dev->parent)->data_role == TYPEC_HOST)  {\n\t\tu32 devcap = PD_VDO_UFP_DEVCAP(id->vdo[0]);\n\n\t\tif (devcap & (DEV_USB2_CAPABLE | DEV_USB2_BILLBOARD))\n\t\t\tusb_capability |= USB_CAPABILITY_USB2;\n\t\tif (devcap & DEV_USB3_CAPABLE)\n\t\t\tusb_capability |= USB_CAPABILITY_USB3;\n\t\tif (devcap & DEV_USB4_CAPABLE)\n\t\t\tusb_capability |= USB_CAPABILITY_USB4;\n\t} else {\n\t\tusb_capability = PD_VDO_DFP_HOSTCAP(id->vdo[0]);\n\t}\n\n\tif (partner->usb_capability != usb_capability) {\n\t\tpartner->usb_capability = usb_capability;\n\t\tsysfs_notify(&dev->kobj, NULL, \"usb_mode\");\n\t}\n\n\ttypec_report_identity(dev);\n\treturn 0;\n}\nEXPORT_SYMBOL_GPL(typec_partner_set_identity);\n\n/**\n * typec_partner_set_pd_revision - Set the PD revision supported by the partner\n * @partner: The partner to be updated.\n * @pd_revision:  USB Power Delivery Specification Revision supported by partner\n *\n * This routine is used to report that the PD revision of the port partner has\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641381208,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "Now I need to trace where `typec_unregister_partner` and the port-mapper are being called from to understand the flow better.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01Sh6uBcGHXY4eC6oTBPBGqs\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"typec_partner_link_device|typec_partner_unlink_device|typec_link_ports|typec_unlink_ports|typec_unregister_partner\\\" drivers/usb/typec drivers/usb/core include -n\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01Sh6uBcGHXY4eC6oTBPBGqs",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"typec_partner_link_device|typec_partner_unlink_device|typec_link_ports|typec_unlink_ports|typec_unregister_partner\" drivers/usb/typec drivers/usb/core include -n"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641384637,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01Sh6uBcGHXY4eC6oTBPBGqs",
+      "tool_name": "bash",
+      "content": "drivers/usb/typec/wusb3801.c:273:\t\t\ttypec_unregister_partner(wusb3801->partner);\ndrivers/usb/typec/wusb3801.c:409:\t\ttypec_unregister_partner(wusb3801->partner);\ndrivers/usb/typec/tipd/core.c:389:\t\ttypec_unregister_partner(tps->partner);\ndrivers/usb/typec/tipd/core.c:787:\t\t\ttypec_unregister_partner(tps->partner);\ndrivers/usb/typec/class.c:888:static void typec_partner_link_device(struct typec_partner *partner, struct device *dev)\ndrivers/usb/typec/class.c:906:static void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\ndrivers/usb/typec/class.c:1159:\t\ttypec_partner_link_device(partner, port->usb2_dev);\ndrivers/usb/typec/class.c:1161:\t\ttypec_partner_link_device(partner, port->usb3_dev);\ndrivers/usb/typec/class.c:1169: * typec_unregister_partner - Unregister a USB Type-C Partner\ndrivers/usb/typec/class.c:1174:void typec_unregister_partner(struct typec_partner *partner)\ndrivers/usb/typec/class.c:1185:\t\ttypec_partner_unlink_device(partner, port->usb2_dev);\ndrivers/usb/typec/class.c:1189:\t\ttypec_partner_unlink_device(partner, port->usb3_dev);\ndrivers/usb/typec/class.c:1196:EXPORT_SYMBOL_GPL(typec_unregister_partner);\ndrivers/usb/typec/class.c:2163:\t\ttypec_partner_link_device(partner, dev);\ndrivers/usb/typec/class.c:2177:\t\ttypec_partner_unlink_device(partner, dev);\ndrivers/usb/typec/class.c:2814:\tret = typec_link_ports(port);\ndrivers/usb/typec/class.c:2831:\t\ttypec_unlink_ports(port);\ndrivers/usb/typec/port-mapper.c:79:int typec_link_ports(struct typec_port *con)\ndrivers/usb/typec/port-mapper.c:104:void typec_unlink_ports(struct typec_port *con)\ndrivers/usb/typec/anx7411.c:588:\t\ttypec_unregister_partner(ctx->typec.partner);\ndrivers/usb/typec/class.h:108:int typec_link_ports(struct typec_port *connector);\ndrivers/usb/typec/class.h:109:void typec_unlink_ports(struct typec_port *connector);\ndrivers/usb/typec/class.h:111:static inline int typec_link_ports(struct typec_port *connector) { return 0; }\ndrivers/usb/typec/class.h:112:static inline void typec_unlink_ports(struct typec_port *connector) { }\ndrivers/usb/typec/stusb160x.c:388:\ttypec_unregister_partner(chip->partner);\ndrivers/usb/typec/stusb160x.c:468:\t\ttypec_unregister_partner(chip->partner);\ndrivers/usb/typec/stusb160x.c:805:\t\ttypec_unregister_partner(chip->partner);\ndrivers/usb/typec/tcpm/tcpm.c:4492:\t\t\ttypec_unregister_partner(port->partner);\ndrivers/usb/typec/ucsi/ucsi.c:1151:\ttypec_unregister_partner(con->partner);\ndrivers/usb/typec/rt1719.c:239:\t\ttypec_unregister_partner(data->partner);\ndrivers/usb/typec/rt1719.c:288:\ttypec_unregister_partner(data->partner);\ninclude/linux/usb/typec.h:331:void typec_unregister_partner(struct typec_partner *partner);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641384638,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01CttQ1ujH3a9ftMukmYuKVy\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && sed -n 1100,1200p drivers/usb/typec/class.c && sed -n 2130,2200p drivers/usb/typec/class.c && cat drivers/usb/typec/port-mapper.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01CttQ1ujH3a9ftMukmYuKVy",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && sed -n 1100,1200p drivers/usb/typec/class.c && sed -n 2130,2200p drivers/usb/typec/class.c && cat drivers/usb/typec/port-mapper.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641386990,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01CttQ1ujH3a9ftMukmYuKVy",
+      "tool_name": "bash",
+      "content": " * @desc: Description of the partner\n *\n * Registers a device for USB Type-C Partner described in @desc.\n *\n * Returns handle to the partner on success or ERR_PTR on failure.\n */\nstruct typec_partner *typec_register_partner(struct typec_port *port,\n\t\t\t\t\t     struct typec_partner_desc *desc)\n{\n\tstruct typec_partner *partner;\n\tint ret;\n\n\tpartner = kzalloc_obj(*partner);\n\tif (!partner)\n\t\treturn ERR_PTR(-ENOMEM);\n\n\tida_init(&partner->mode_ids);\n\tpartner->usb_pd = desc->usb_pd;\n\tpartner->accessory = desc->accessory;\n\tpartner->num_altmodes = -1;\n\tpartner->usb_capability = desc->usb_capability;\n\tpartner->pd_revision = desc->pd_revision;\n\tpartner->svdm_version = port->cap->svdm_version;\n\tpartner->attach = desc->attach;\n\tpartner->deattach = desc->deattach;\n\n\tif (desc->identity) {\n\t\t/*\n\t\t * Creating directory for the identity only if the driver is\n\t\t * able to provide data to it.\n\t\t */\n\t\tpartner->dev.groups = usb_pd_id_groups;\n\t\tpartner->identity = desc->identity;\n\t}\n\n\tpartner->dev.class = &typec_class;\n\tpartner->dev.parent = &port->dev;\n\tpartner->dev.type = &typec_partner_dev_type;\n\tdev_set_name(&partner->dev, \"%s-partner\", dev_name(&port->dev));\n\n\tif (port->usb2_dev) {\n\t\tpartner->usb_capability |= USB_CAPABILITY_USB2;\n\t\tpartner->usb_mode = USB_MODE_USB2;\n\t}\n\tif (port->usb3_dev) {\n\t\tpartner->usb_capability |= USB_CAPABILITY_USB2 | USB_CAPABILITY_USB3;\n\t\tpartner->usb_mode = USB_MODE_USB3;\n\t}\n\n\tmutex_lock(&port->partner_link_lock);\n\tret = device_register(&partner->dev);\n\tif (ret) {\n\t\tdev_err(&port->dev, \"failed to register partner (%d)\\n\", ret);\n\t\tmutex_unlock(&port->partner_link_lock);\n\t\tput_device(&partner->dev);\n\t\treturn ERR_PTR(ret);\n\t}\n\n\tif (port->usb2_dev)\n\t\ttypec_partner_link_device(partner, port->usb2_dev);\n\tif (port->usb3_dev)\n\t\ttypec_partner_link_device(partner, port->usb3_dev);\n\tmutex_unlock(&port->partner_link_lock);\n\n\treturn partner;\n}\nEXPORT_SYMBOL_GPL(typec_register_partner);\n\n/**\n * typec_unregister_partner - Unregister a USB Type-C Partner\n * @partner: The partner to be unregistered\n *\n * Unregister device created with typec_register_partner().\n */\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n\tstruct typec_port *port;\n\n\tif (IS_ERR_OR_NULL(partner))\n\t\treturn;\n\n\tport = to_typec_port(partner->dev.parent);\n\n\tmutex_lock(&port->partner_link_lock);\n\tif (port->usb2_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb2_dev);\n\t\tport->usb2_dev = NULL;\n\t}\n\tif (port->usb3_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb3_dev);\n\t\tport->usb3_dev = NULL;\n\t}\n\n\tdevice_unregister(&partner->dev);\n\tmutex_unlock(&port->partner_link_lock);\n}\nEXPORT_SYMBOL_GPL(typec_unregister_partner);\n\n/* ------------------------------------------------------------------------- */\n/* Type-C Cable Plugs */\n\n/* Driver callbacks to report role updates */\n\nstatic struct typec_partner *typec_get_partner(struct typec_port *port)\n{\n\tstruct device *dev;\n\n\tdev = device_find_child(&port->dev, &typec_partner_dev_type,\n\t\t\t\tdevice_match_type);\n\tif (!dev)\n\t\treturn NULL;\n\n\treturn to_typec_partner(dev);\n}\n\nstatic void typec_partner_attach(struct typec_connector *con, struct device *dev)\n{\n\tstruct typec_port *port = container_of(con, struct typec_port, con);\n\tstruct typec_partner *partner;\n\tstruct usb_device *udev = to_usb_device(dev);\n\tenum usb_mode usb_mode;\n\n\tmutex_lock(&port->partner_link_lock);\n\tif (udev->speed < USB_SPEED_SUPER) {\n\t\tusb_mode = USB_MODE_USB2;\n\t\tport->usb2_dev = dev;\n\t} else {\n\t\tusb_mode = USB_MODE_USB3;\n\t\tport->usb3_dev = dev;\n\t}\n\n\tpartner = typec_get_partner(port);\n\tif (partner) {\n\t\ttypec_partner_set_usb_mode(partner, usb_mode);\n\t\ttypec_partner_link_device(partner, dev);\n\t\tput_device(&partner->dev);\n\t}\n\tmutex_unlock(&port->partner_link_lock);\n}\n\nstatic void typec_partner_deattach(struct typec_connector *con, struct device *dev)\n{\n\tstruct typec_port *port = container_of(con, struct typec_port, con);\n\tstruct typec_partner *partner;\n\n\tmutex_lock(&port->partner_link_lock);\n\tpartner = typec_get_partner(port);\n\tif (partner) {\n\t\ttypec_partner_unlink_device(partner, dev);\n\t\tput_device(&partner->dev);\n\t}\n\n\tif (port->usb2_dev == dev)\n\t\tport->usb2_dev = NULL;\n\telse if (port->usb3_dev == dev)\n\t\tport->usb3_dev = NULL;\n\tmutex_unlock(&port->partner_link_lock);\n}\n\n/**\n * typec_set_data_role - Report data role change\n * @port: The USB Type-C Port where the role was changed\n * @role: The new data role\n *\n * This routine is used by the port drivers to report data role changes.\n */\nvoid typec_set_data_role(struct typec_port *port, enum typec_data_role role)\n{\n\tstruct typec_partner *partner;\n\n\tif (port->data_role == role)\n\t\treturn;\n// SPDX-License-Identifier: GPL-2.0\n/*\n * USB Type-C Connector Class Port Mapping Utility\n *\n * Copyright (C) 2021, Intel Corporation\n * Author: Heikki Krogerus <heikki.krogerus@linux.intel.com>\n */\n\n#include <linux/acpi.h>\n#include <linux/component.h>\n#include <linux/thunderbolt.h>\n#include <linux/usb.h>\n\n#include \"class.h\"\n\nstatic int typec_aggregate_bind(struct device *dev)\n{\n\tstruct typec_port *port = to_typec_port(dev);\n\n\treturn component_bind_all(dev, &port->con);\n}\n\nstatic void typec_aggregate_unbind(struct device *dev)\n{\n\tstruct typec_port *port = to_typec_port(dev);\n\n\tcomponent_unbind_all(dev, &port->con);\n}\n\nstatic const struct component_master_ops typec_aggregate_ops = {\n\t.bind = typec_aggregate_bind,\n\t.unbind = typec_aggregate_unbind,\n};\n\nstruct each_port_arg {\n\tstruct typec_port *port;\n\tstruct component_match *match;\n};\n\nstatic int usb4_port_compare(struct device *dev, void *fwnode)\n{\n\treturn usb4_usb3_port_match(dev, fwnode);\n}\n\nstatic int typec_port_compare(struct device *dev, void *fwnode)\n{\n\treturn device_match_fwnode(dev, fwnode);\n}\n\nstatic int typec_port_match(struct device *dev, void *data)\n{\n\tstruct acpi_device *adev = to_acpi_device(dev);\n\tstruct each_port_arg *arg = data;\n\tstruct acpi_device *con_adev;\n\n\tcon_adev = ACPI_COMPANION(&arg->port->dev);\n\tif (con_adev == adev)\n\t\treturn 0;\n\n\tif (con_adev->pld_crc == adev->pld_crc)\t{\n\t\tstruct fwnode_handle *adev_fwnode = acpi_fwnode_handle(adev);\n\n\t\tcomponent_match_add(&arg->port->dev, &arg->match, typec_port_compare,\n\t\t\t\t    adev_fwnode);\n\n\t\t/*\n\t\t * If dev is USB 3.x port, it may have reference to the\n\t\t * USB4 host interface in which case we can also link the\n\t\t * Type-C port with the USB4 port.\n\t\t */\n\t\tif (fwnode_property_present(adev_fwnode, \"usb4-host-interface\"))\n\t\t\tcomponent_match_add(&arg->port->dev, &arg->match,\n\t\t\t\t\t    usb4_port_compare, adev_fwnode);\n\t}\n\n\treturn 0;\n}\n\nint typec_link_ports(struct typec_port *con)\n{\n\tstruct each_port_arg arg = { .port = con, .match = NULL };\n\n\tif (!has_acpi_companion(&con->dev))\n\t\treturn 0;\n\n\tacpi_bus_for_each_dev(typec_port_match, &arg);\n\tif (!arg.match)\n\t\treturn 0;\n\n\t/*\n\t * REVISIT: Now each connector can have only a single component master.\n\t * So far only the USB ports connected to the USB Type-C connector share\n\t * the _PLD with it, but if there one day is something else (like maybe\n\t * the DisplayPort ACPI device object) that also shares the _PLD with\n\t * the connector, every one of those needs to have its own component\n\t * master, because each different type of component needs to be bind to\n\t * the connector independently of the other components. That requires\n\t * improvements to the component framework. Right now you can only have\n\t * one master per device.\n\t */\n\treturn component_master_add_with_match(&con->dev, &typec_aggregate_ops, arg.match);\n}\n\nvoid typec_unlink_ports(struct typec_port *con)\n{\n\tif (has_acpi_companion(&con->dev))\n\t\tcomponent_master_del(&con->dev, &typec_aggregate_ops);\n}\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641386992,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I'm tracing through the USB Type-C partner attachment flow and noticing a potential issue: `typec_partner_attach` sets `port->usb2_dev` even when no partner exists yet, but `typec_partner_link_device` only gets called if a partner is present. The real problem emerges in `typec_register_partner` where a link is created for `port->usb2_dev`, and if that link creation fails or the link already exists, we get sysfs errors when trying to remove it later.\n\nThe root cause appears to be that `typec_partner_unlink_device` attempts to remove a link that was never successfully created in the first place—the link creation failure was silently ignored in the earlier code path. I should search the upstream kernel repository for related fixes, particularly around NULL pointer access issues in the USB Type-C class driver.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_017irsiZS74XKoznYiHytAsq\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --oneline -30 -- drivers/usb/typec/class.c | cat\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_017irsiZS74XKoznYiHytAsq",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --oneline -30 -- drivers/usb/typec/class.c | cat"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641395755,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_017irsiZS74XKoznYiHytAsq",
+      "tool_name": "bash",
+      "content": "b65d4ca1d105 usb: typec: Remove alt->adev.dev.class assignment\nbf4afc53b77a Convert 'alloc_obj' family to use the new default GFP_KERNEL argument\n69050f8d6d07 treewide: Replace kmalloc with kmalloc_obj for non-scalar types\nbe727d400066 usb: typec: Introduce mode_selection bit\n027b304ca3f6 usb: typec: Expose alternate mode priority via sysfs\ndfd7b082c0a2 usb: typec: Add mode_control field to port property\n4dee13db29de usb: typec: Export typec bus and typec altmode device type\n67ab45426215 usb: typec: Set the bus also for the port and plug altmodes\ned4a5c5de56a usb: typec: class: add typec_get_data_role symbol\n429a98abfc01 usb: typec: class: Unlocked on error in typec_register_partner()\n66e1a887273c usb: typec: class: Invalidate USB device pointers on partner unregistration\nec27386de23a usb: typec: class: Fix NULL pointer access\n2ab002c755bf Merge tag 'driver-core-6.14-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core\n13b3af26a415 USB: typec: Use str_enable_disable-like helpers\ncf7da549cf72 usb: typec: class: Remove both cable_match() and partner_match()\nf1e8bf56320a driver core: Constify API device_find_child() and adapt for various usages\n183b194d8fb6 usb: typec: Make active on port altmode writable\n8541bf0239b8 usb: typec: Only use SVID for matching altmodes\n85c4efbe6088 Merge v6.12-rc6 into usb-next\n1ab0b9ae5873 usb: typec: use cleanup facility for 'altmodes_node'\n9581acb91eaf usb: typec: fix unreleased fwnode_handle in typec_port_register_altmodes()\nc6d9e43954bf Merge 6.12-rc4 into usb-next\n2140a952c4e9 usb: typec: Add attribute file showing the USB Modes of the partner\n8060bcb109f2 usb: typec: Add attribute file showing the supported USB modes of the port\nbefab3a278c5 usb: typec: altmode should keep reference to parent\nfe8db0bbe04d usb: typec: Update sysfs when setting ops\n53f5094fdf5d usb: typec: Return size of buffer if pd_set operation succeeds\nc40b51b3f365 usb: typec: constify struct class usage\n231b7318413c usb: typec: altmodes: add svdm version info for typec cables\n7494d4bc8e32 usb: typec: altmodes: add typec_cable_ops to typec_altmode\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641395757,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I found an existing fix for this issue, but the warning persists—let me trace through the ucsi.c code around line 1151 to understand the race condition in the unlink path.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01Mbm5zmSbPo4Ky5jvB8M3kF\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git show --stat 66e1a887273c | cat && git show 66e1a887273c | cat | head -80\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01Mbm5zmSbPo4Ky5jvB8M3kF",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git show --stat 66e1a887273c | cat && git show 66e1a887273c | cat | head -80"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641399271,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01Mbm5zmSbPo4Ky5jvB8M3kF",
+      "tool_name": "bash",
+      "content": "commit 66e1a887273c6b89f09bc11a40d0a71d5a081a8e\nAuthor: Andrei Kuchynski <akuchynski@chromium.org>\nDate:   Fri Mar 21 14:37:27 2025 +0000\n\n    usb: typec: class: Invalidate USB device pointers on partner unregistration\n    \n    To avoid using invalid USB device pointers after a Type-C partner\n    disconnects, this patch clears the pointers upon partner unregistration.\n    This ensures a clean state for future connections.\n    \n    Cc: stable@vger.kernel.org\n    Fixes: 59de2a56d127 (\"usb: typec: Link enumerated USB devices with Type-C partner\")\n    Signed-off-by: Andrei Kuchynski <akuchynski@chromium.org>\n    Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>\n    Reviewed-by: Benson Leung <bleung@chromium.org>\n    Link: https://lore.kernel.org/r/20250321143728.4092417-3-akuchynski@chromium.org\n    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>\n\n drivers/usb/typec/class.c | 8 ++++++--\n 1 file changed, 6 insertions(+), 2 deletions(-)\ncommit 66e1a887273c6b89f09bc11a40d0a71d5a081a8e\nAuthor: Andrei Kuchynski <akuchynski@chromium.org>\nDate:   Fri Mar 21 14:37:27 2025 +0000\n\n    usb: typec: class: Invalidate USB device pointers on partner unregistration\n    \n    To avoid using invalid USB device pointers after a Type-C partner\n    disconnects, this patch clears the pointers upon partner unregistration.\n    This ensures a clean state for future connections.\n    \n    Cc: stable@vger.kernel.org\n    Fixes: 59de2a56d127 (\"usb: typec: Link enumerated USB devices with Type-C partner\")\n    Signed-off-by: Andrei Kuchynski <akuchynski@chromium.org>\n    Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>\n    Reviewed-by: Benson Leung <bleung@chromium.org>\n    Link: https://lore.kernel.org/r/20250321143728.4092417-3-akuchynski@chromium.org\n    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>\n\ndiff --git a/drivers/usb/typec/class.c b/drivers/usb/typec/class.c\nindex eadb150223f8..3df3e3736916 100644\n--- a/drivers/usb/typec/class.c\n+++ b/drivers/usb/typec/class.c\n@@ -1086,10 +1086,14 @@ void typec_unregister_partner(struct typec_partner *partner)\n \tport = to_typec_port(partner->dev.parent);\n \n \tmutex_lock(&port->partner_link_lock);\n-\tif (port->usb2_dev)\n+\tif (port->usb2_dev) {\n \t\ttypec_partner_unlink_device(partner, port->usb2_dev);\n-\tif (port->usb3_dev)\n+\t\tport->usb2_dev = NULL;\n+\t}\n+\tif (port->usb3_dev) {\n \t\ttypec_partner_unlink_device(partner, port->usb3_dev);\n+\t\tport->usb3_dev = NULL;\n+\t}\n \n \tdevice_unregister(&partner->dev);\n \tmutex_unlock(&port->partner_link_lock);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641399273,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The kernel version 6.17.0-1011-oem already contains the fix from tree 7.0, so the warning must be stemming from a different race condition. I'm investigating the partner registration and unregistration logic in ucsi.c, particularly whether typec_partner_link_device properly handles failures. There's a known issue where the device link creation fails or the partner gets registered before the USB device is ready, causing the \"can not remove 'typec'\" warning when sysfs tries to clean up.\n\nThe problem appears to be that _remove_link gets called but the link never existed in the first place — either the link creation failed and returned early without being tracked, or the link was created on a different device entirely. I should check if there's a recent upstream fix series from Andrei Kuchynski addressing port state issues, and search through the git history for commits touching link_device.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01QLRDGJmtueqKH7FYzo77c9\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --oneline --all -S\\\"typec_partner_link_device\\\" -- drivers/usb/typec/class.c | cat\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01QLRDGJmtueqKH7FYzo77c9",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --oneline --all -S\"typec_partner_link_device\" -- drivers/usb/typec/class.c | cat"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641410489,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01QLRDGJmtueqKH7FYzo77c9",
+      "tool_name": "bash",
+      "content": "59de2a56d127 usb: typec: Link enumerated USB devices with Type-C partner\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641410490,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The issue is that `sysfs_remove_link` is being called for a \"typec\" link that was never created in the first place. This happens when `typec_partner_link_device` fails to create the link (either because it already exists or the creation was skipped), but the port's USB2/USB3 device pointers are still set, causing the unlink operation to attempt removing a nonexistent link.\n\nI need to trace through a few scenarios: one where the partner attachment sets the device pointer before the partner is actually registered, another where link creation fails but the device pointer isn't cleared, and a potential race condition in the UCSI connector handling where multiple partner devices could be registered. Let me check the kernfs and UCSI code paths to understand the exact flow.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01HpSsqujBeRAyRGq5CJ2SRW\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && sed -n 1090,1180p drivers/usb/typec/ucsi/ucsi.c; rg -n \\\"ucsi_unregister_partner|ucsi_register_partner|ucsi_partner_change|ucsi_handle_connector_change\\\" drivers/usb/typec/ucsi/ucsi.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01HpSsqujBeRAyRGq5CJ2SRW",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && sed -n 1090,1180p drivers/usb/typec/ucsi/ucsi.c; rg -n \"ucsi_unregister_partner|ucsi_register_partner|ucsi_partner_change|ucsi_handle_connector_change\" drivers/usb/typec/ucsi/ucsi.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641419367,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01HpSsqujBeRAyRGq5CJ2SRW",
+      "tool_name": "bash",
+      "content": "\tif (con->partner)\n\t\treturn 0;\n\n\tmemset(&desc, 0, sizeof(desc));\n\n\tswitch (UCSI_CONSTAT(con, PARTNER_TYPE)) {\n\tcase UCSI_CONSTAT_PARTNER_TYPE_DEBUG:\n\t\tdesc.accessory = TYPEC_ACCESSORY_DEBUG;\n\t\tbreak;\n\tcase UCSI_CONSTAT_PARTNER_TYPE_AUDIO:\n\t\tdesc.accessory = TYPEC_ACCESSORY_AUDIO;\n\t\tbreak;\n\tdefault:\n\t\tbreak;\n\t}\n\n\tif (pwr_opmode == UCSI_CONSTAT_PWR_OPMODE_PD)\n\t\tucsi_register_device_pdos(con);\n\n\tif (con->ucsi->cap.features & UCSI_CAP_GET_PD_MESSAGE)\n\t\tdesc.identity = &con->partner_identity;\n\tdesc.usb_pd = pwr_opmode == UCSI_CONSTAT_PWR_OPMODE_PD;\n\n\tif (con->ucsi->version >= UCSI_VERSION_2_1) {\n\t\tu64 pd_revision = UCSI_CONCAP(con, PARTNER_PD_REVISION_V2_1);\n\t\tdesc.pd_revision = UCSI_SPEC_REVISION_TO_BCD(pd_revision);\n\t}\n\n\tpartner = typec_register_partner(con->port, &desc);\n\tif (IS_ERR(partner)) {\n\t\tdev_err(con->ucsi->dev,\n\t\t\t\"con%d: failed to register partner (%ld)\\n\", con->num,\n\t\t\tPTR_ERR(partner));\n\t\treturn PTR_ERR(partner);\n\t}\n\n\tcon->partner = partner;\n\n\tif (con->ucsi->version >= UCSI_VERSION_3_0 &&\n\t    UCSI_CONSTAT(con, PARTNER_FLAG_USB4_GEN4))\n\t\ttypec_partner_set_usb_mode(partner, USB_MODE_USB4);\n\telse if (con->ucsi->version >= UCSI_VERSION_2_0 &&\n\t\t UCSI_CONSTAT(con, PARTNER_FLAG_USB4_GEN3))\n\t\ttypec_partner_set_usb_mode(partner, USB_MODE_USB4);\n\n\treturn 0;\n}\n\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner)\n\t\treturn;\n\n\ttypec_set_mode(con->port, TYPEC_STATE_SAFE);\n\tif (con->ucsi->ops->remove_partner_altmodes)\n\t\tcon->ucsi->ops->remove_partner_altmodes(con);\n\n\ttypec_partner_set_usb_power_delivery(con->partner, NULL);\n\tucsi_unregister_partner_pdos(con);\n\tucsi_unregister_altmodes(con, UCSI_RECIPIENT_SOP);\n\tucsi_unregister_cable(con);\n\ttypec_unregister_partner(con->partner);\n\tmemset(&con->partner_identity, 0, sizeof(con->partner_identity));\n\tcon->partner = NULL;\n}\n\nstatic void ucsi_partner_change(struct ucsi_connector *con)\n{\n\tenum usb_role u_role = USB_ROLE_NONE;\n\tint ret;\n\n\tswitch (UCSI_CONSTAT(con, PARTNER_TYPE)) {\n\tcase UCSI_CONSTAT_PARTNER_TYPE_UFP:\n\tcase UCSI_CONSTAT_PARTNER_TYPE_CABLE_AND_UFP:\n\t\tu_role = USB_ROLE_HOST;\n\t\tfallthrough;\n\tcase UCSI_CONSTAT_PARTNER_TYPE_CABLE:\n\t\ttypec_set_data_role(con->port, TYPEC_HOST);\n\t\tbreak;\n\tcase UCSI_CONSTAT_PARTNER_TYPE_DFP:\n\t\tu_role = USB_ROLE_DEVICE;\n\t\ttypec_set_data_role(con->port, TYPEC_DEVICE);\n\t\tbreak;\n\tdefault:\n\t\tbreak;\n\t}\n\n\tif (UCSI_CONSTAT(con, CONNECTED)) {\n\t\tswitch (UCSI_CONSTAT(con, PARTNER_TYPE)) {\n\t\tcase UCSI_CONSTAT_PARTNER_TYPE_DEBUG:\n\t\t\ttypec_set_mode(con->port, TYPEC_MODE_DEBUG);\n887:static int ucsi_register_partner_pdos(struct ucsi_connector *con)\n914:static void ucsi_unregister_partner_pdos(struct ucsi_connector *con)\n1063:\t\tucsi_partner_task(con, ucsi_register_partner_pdos, 1, HZ);\n1084:static int ucsi_register_partner(struct ucsi_connector *con)\n1138:static void ucsi_unregister_partner(struct ucsi_connector *con)\n1148:\tucsi_unregister_partner_pdos(con);\n1156:static void ucsi_partner_change(struct ucsi_connector *con)\n1215:\t\tucsi_register_partner(con);\n1217:\t\tucsi_partner_change(con);\n1219:\t\tucsi_partner_change(con);\n1221:\t\tucsi_unregister_partner(con);\n1264:static void ucsi_handle_connector_change(struct work_struct *work)\n1309:\t\tucsi_partner_change(con);\n1313:\t\t\tucsi_register_partner(con);\n1321:\t\t\t\tucsi_partner_task(con, ucsi_register_partner_pdos, 1, HZ);\n1325:\t\t\tucsi_unregister_partner(con);\n1333:\t\tucsi_partner_change(con);\n1632:\tINIT_WORK(&con->work, ucsi_handle_connector_change);\n1746:\t\tucsi_register_partner(con);\n1912:\t\tucsi_unregister_partner(con);\n2147:\t\tucsi_unregister_partner(&ucsi->connector[i]);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641419368,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The real problem is a race condition between the USB device enumeration process (typec_partner_attach/detach via the port-mapper) and the unregister flow. The sysfs warning about removing a non-existent 'typec' directory happens because sysfs_remove_link is being called on a device where the symlink was never actually created — either because typec_partner_link_device failed early when trying to create the link, or the unlink function is being called twice on the same device.\n\nThere's likely an upstream fix series addressing this, possibly involving how port->usb2_dev is managed when link creation fails. The issue could also stem from a race where a partner gets registered while the USB device is still attached, then unregistered, then a new partner registers — creating a mismatch between when links are created and destroyed relative to the device lifecycle.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_016iaACaBiMHzP6oD9XhQgZR\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --oneline --all --since=2025-01-01 -- drivers/usb/typec/ | cat | head -60; echo ---; git log --all --grep=\\\"sysfs\\\" --oneline -- drivers/usb/typec/class.c | cat\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_016iaACaBiMHzP6oD9XhQgZR",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --oneline --all --since=2025-01-01 -- drivers/usb/typec/ | cat | head -60; echo ---; git log --all --grep=\"sysfs\" --oneline -- drivers/usb/typec/class.c | cat"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641437126,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_016iaACaBiMHzP6oD9XhQgZR",
+      "tool_name": "bash",
+      "content": "fb0bf289f5d5 usb: typec: ucsi: Correct teardown ordering in ucsi_init() error path\n8706409bd45f usb: typec: ucsi: yoga_c630: Remove redundant duplicate altmode handling\nf1aa17f72f9b usb: typec: ucsi: Add duplicate detection to nvidia registration path\n67c92c6419ea usb: typec: ucsi: Detect and skip duplicate altmodes from buggy firmware\n7aa7d4bf9d3f usb: typec: ucsi: Fix race condition and ordering in port unregistration\n534f8f051e5e Merge tag 'usb-7.2-rc3' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb\nf576c75f95a5 Revert \"usb: typec: mux: avoid duplicated mux switches\"\nc7eaea5c6eeb usb: ucsi: huawei_gaokun: move typec_altmode off stack\ne8da46d99d37 usb: typec: tcpci_rt1711h: unregister TCPCI port with devres\n9cff680e4763 usb: typec: tcpm: Fix VDM type for Enter Mode commands\n7c4a234bd31a usb: typec: ucsi: cancel pending work on system suspend\n43ae2f90b70c usb: typec: class: drop PD lookup reference\nb229b22b0a94 usb: typec: ps883x: Fix DP+USB3 configuration\n0ef7cc27da8b usb: typec: anx7411: use devm_pm_runtime_enable()\n735a461d060d usb: typec: ucsi: Pass full DP config payload in SET_NEW_CAM for DP alt mode\n995832b2cebe Replace <linux/mod_devicetable.h> by more specific <linux/device-id/*.h> (c files)\n1f0bdc2884b6 usb: typec: ucsi: ccg: Fix use-after-free of ucsi on remove\n7b681dd5fbf6 usb: typec: tcpm: Validate SVID index in svdm_consume_modes()\nd092d7edf8fa usb: typec: ucsi: Invert DisplayPort role assignment\n1c2b66a7d725 usb: ucsi: huawei_gaokun: support mode switching\n55311a92bc95 Merge tag 'v7.1-rc6' into usb-next\ncc1543548169 usb: typec: ucsi: Add support for SET_PDOS command\n201b015f95b8 usb: typec: ucsi: Enable debugfs for message_out data structure\n7c4030692710 usb: typec: ucsi: Add support for message_out data structure\n506927b6bf29 usb: typec: tcpm: qcom: prefer VBUS supply from the connector node\n5092914dd92e USB: typec: qcom-pmic-typec: Drop redundant header includes\n8c22256bbafa usb: typec: ucsi: split connector lock classes\nc708d07ce706 usb: typec: intel_pmc_mux: Zero initialize num_ports in pmc_usb_probe()\nd98d413ca65d usb: typec: ucsi: Don't update power_supply on power role change if not connected\nb80e7d34c7ea usb: typec: ucsi: Check if power role change actually happened before handling\nc06e6cd48819 usb: typec: tcpm: improve handling of DISCOVER_MODES failures\n52be520ca9ef usb: typec: Use named initializers for arrays of i2c_device_data\ndfb128920f75 usb: typec: Use FIELD_MODIFY()\nca927fc45e49 usb: typec: fusb302: Fix resource leak when devm_drm_dp_hpd_bridge_add() fails\n288a81a85070 usb: typec: ucsi: validate connector number in ucsi_connector_change()\n167dd8d12226 usb: typec: ucsi: displayport: NAK DP_CMD_CONFIGURE without a payload VDO\n3389c149c68c usb: typec: tcpm: bound altmode_desc[] per iteration in svdm_consume_modes()\n8fbc349e8383 usb: typec: tcpm: validate VDO count in Discover Identity ACK handlers\naa2f716327be usb: typec: tcpm/tcpci_maxim: validate header NDO against RX_BYTE_CNT\n8a18f896e667 usb: typec: altmodes/displayport: validate count before reading Status Update VDO\n4af7ad0e6d7a usb: typec: wcove: don't write past struct pd_message in wcove_read_rx_buffer()\nd7486952bf74 usb: typec: ucsi: ccg: reject firmware images without a ':' record header\nb02900c85a64 usb: typec: tipd: Fix error code in tps6598x_probe()\ne18b0dbb6ec6 Merge tag 'v7.1-rc3' into usb-next\n8bdb0b3830ea usb: typec: intel_pmc_mux: combine kzalloc + kcalloc\nb38fa168a848 usb: typec: mux: ps883x: Power the retimer off when not in use\nf6ec9bb4acc7 usb: typec: tcpm: fix debug accessory mode detection for sink ports\n2909f0d4994f usb: typec: tcpm: reset internal port states on soft reset AMS\n99ef60d119f3 Merge tag 'usb-7.1-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb\n40b17a345d3f usb: typec: cros_ec_ucsi: Load driver from OF and ACPI definitions\n1ace770f5de3 usb: typec: ucsi: Set usb mode on partner change\n5a1140404cbf usb: typec: ucsi: skip connector validation before init\n3723393cc284 Merge tag 'v7.0-rc7' into usb-next\n3b8ae9817686 usb: typec: thunderbolt: Set enter_vdo during initialization\nb65d4ca1d105 usb: typec: Remove alt->adev.dev.class assignment\n0c8935642cb0 usb: typec: tcpm/tcpci_maxim: deprecate WAR for setting charger mode\n6b9db5319709 usb: typec: fusb302: Switch to threaded IRQ handler\nb41470c6b4d4 usb: typec: tcpci_rt1711h: Drop unnecessary VID/PID/DID checks\n35a99b690c9e usb: typec: tcpci: support setting orientation via GPIO\nd2d8c17ac01a usb: typec: ucsi: validate connector number in ucsi_notify_common()\n---\n43ae2f90b70c usb: typec: class: drop PD lookup reference\nb65d4ca1d105 usb: typec: Remove alt->adev.dev.class assignment\n027b304ca3f6 usb: typec: Expose alternate mode priority via sysfs\nfe8db0bbe04d usb: typec: Update sysfs when setting ops\n609fded3f919 usb: typec: Use sysfs_emit_at when concatenating the string\nb7cafb8b06a0 usb: typec: Remove retimers properly\nddaf8d96f93b usb: typec: Add support for retimers\na7cff92f0635 usb: typec: USB Power Delivery helpers for ports and partners\n29b01295a829 usb: typec: Add typec_partner_set_pd_revision\n1ed8459d8f10 usb: typec: Standardize PD Revision format with Type-C Revision\n6c75c2bad36c usb: typec: Send uevent for num_altmodes update\nab37fa851c48 usb: typec: Add type sysfs attribute file for partners\n2e70c495cade usb: typec: Expose Product Type VDOs via sysfs\ne1e52361c61a usb: typec: Add plug num_altmodes sysfs attr\na0ccdc4a77a1 usb: typec: Add number of altmodes partner attr\n75f81a7ffe4d usb: typec: Add sysfs node to show cc orientation\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641437128,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "Looking at the kernel version mismatch between the fictional Linux 7.0 tree and the reported kernel 6.17.0-1011-oem, I need to trace through the git history to find the root cause of this issue. I'm searching for the typec_partner_attach race condition and any related upstream fixes, particularly around the usb typec class and kernfs warning fixes that might explain what's happening.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01Pbuq5dhFL514hunNJ9RsBT\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --all --oneline --grep=\\\"kernfs\\\" --grep=\\\"can not remove\\\" --grep=\\\"unlink\\\" -i -- drivers/usb/ | cat | head -30; echo ===; git show --stat 7aa7d4bf9d3f | cat\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01Pbuq5dhFL514hunNJ9RsBT",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --all --oneline --grep=\"kernfs\" --grep=\"can not remove\" --grep=\"unlink\" -i -- drivers/usb/ | cat | head -30; echo ===; git show --stat 7aa7d4bf9d3f | cat"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641446006,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01Pbuq5dhFL514hunNJ9RsBT",
+      "tool_name": "bash",
+      "content": "59e6295fac26 Merge tag 'driver-core-7.3-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/driver-core/driver-core\nd5e5cd3654d2 usb: gadget: dummy_hcd: prevent fifo_req reuse during giveback\ne0b291fe1179 usb: core: port: Deattach Type-C connector on component unbind\n79e2d75725c8 usb: gadget: f_tcm: synchronize delayed set_alt with teardown\ne2674dfbed8a usb: atm: ueagle-atm: wait for pre-firmware load in .disconnect()\n36808d5e9839 Merge tag 'driver-core-7.2-rc1' of gitolite.kernel.org:pub/scm/linux/kernel/git/driver-core/driver-core\ncaa27923aacd usb: gadget: f_subset: Fix unbalanced refcnt in geth_free\n1c2b4a4c2bcb Merge tag 'pci-v7.0-changes' of git://git.kernel.org/pub/scm/linux/kernel/git/pci/pci\n87e4b043b98a usb: cdns3: fix role switching during resume\n7fa47c131493 usbip: Reduce CONNRESET message noise in dmesg from stub\n7cd122b55283 Merge tag 'pull-persistency' of git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs\n26d56a9fcb20 usb: uas: fix urb unmapping issue when the uas device is remove during ongoing data transfer\nf7812977456c usb: xhci: Assume that endpoints halt as specified\neb9ac779830b usb: renesas_usbhs: Fix synchronous external abort on unbind\n47c83f95f3e2 usb: core: Remove unused usb_unlink_anchored_urbs\n324d45e53f1a usb: typec: tcpm: move tcpm_queue_vdm_unlocked to asynchronous work\nec27386de23a usb: typec: class: Fix NULL pointer access\n33ead7e53818 usb: typec: ucsi: Fix connector status writing past buffer size\n474538b8dd1c usb: xhci: Avoid queuing redundant Stop Endpoint commands\n484c3bab2d5d usb: xhci: Fix TD invalidation under pending Set TR Dequeue\n42b758137601 usb: xhci: Limit Stop Endpoint retries\nbefab3a278c5 usb: typec: altmode should keep reference to parent\n6334b8e4553c usb: gadget: f_ncm: Fix UAF ncm object at re-bind after usb ep transport error\n17af5050dead usb: typec: tcpm: Update PD of Type-C port upon pd_set\n52a39f2cf62b usb: gadget: uvc: cleanup request when not in correct state\n89e7252d6c7e usb: gadget: configfs: Restrict symlink creation is UDC already binded\n71a7507afbc3 Merge tag 'driver-core-6.2-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core\nafdc12887f2b USB: gadget: Fix use-after-free during usb config switch\n05df6ab8eba6 Merge 6.1-rc6 into driver-core-next\n8f36b3b4e1b5 usbip: add USBIP_URB_* URB transfer flags\n===\ncommit 7aa7d4bf9d3fa9a6a47b640ad103ab433b7ff261\nAuthor: Andrei Kuchynski <akuchynski@chromium.org>\nDate:   Tue Jul 7 14:17:36 2026 +0000\n\n    usb: typec: ucsi: Fix race condition and ordering in port unregistration\n    \n    A synchronization issue exists during port unregistration where pending\n    partner work items can race against workqueue destruction, leading to\n    use-after-free conditions:\n    \n      cros_ec_ucsi cros_ec_ucsi.3.auto: error -ETIMEDOUT: PPM init failed\n      BUG: kernel NULL pointer dereference, address: 0000000000000000\n      RIP: 0010:__queue_work+0x83/0x4a0\n      Call Trace:\n        <IRQ>\n        __cfi_delayed_work_timer_fn+0x10/0x10\n        run_timer_softirq+0x3b6/0xbd0\n        sched_clock_cpu+0xc/0x110\n        irq_exit_rcu+0x18d/0x330\n        fred_sysvec_apic_timer_interrupt+0x5e/0x80\n    \n    Fix this by ensuring strict ordering and proper serialization during\n    teardown:\n    \n    1. Move ucsi_unregister_partner() to the beginning of the teardown\n    sequence and protect it under the connector mutex lock.\n    2. Ensure all pending partner tasks are explicitly flushed and finished\n    before the workqueue is destroyed.\n    3. Switch from mod_delayed_work() to a cancel_delayed_work() and\n    queue_delayed_work() sequence. This guarantees that items currently marked\n    as pending won't be scheduled an additional time, preventing a double\n    release of resources which leads to the following crash:\n    \n      Oops: general protection fault, probably for non-canonical address\n        0xdead000000000122: 0000 [#1] SMP NOPTI\n      Workqueue: cros_ec_ucsi.3.auto-con2 ucsi_poll_worker\n      RIP: 0010:ucsi_poll_worker+0x65/0x1e0\n      Call Trace:\n      <TASK>\n        process_scheduled_works+0x218/0x6d0\n        worker_thread+0x188/0x3f0\n        __cfi_worker_thread+0x10/0x10\n        kthread+0x226/0x2a0\n    \n    To ensure these rules are applied identically across both the normal\n    teardown and the ucsi_init() error paths, consolidate the cleanup logic\n    into a new helper, ucsi_unregister_port().\n    \n    Cc: stable <stable@kernel.org>\n    Fixes: b9aa02ca39a4 (\"usb: typec: ucsi: Add polling mechanism for partner tasks like alt mode checking\")\n    Fixes: b13abcb7ddd8 (\"usb: typec: ucsi: Fix NULL pointer access\")\n    Fixes: fac4b8633fd6 (\"usb: ucsi: Ensure connector delayed work items are flushed\")\n    Signed-off-by: Andrei Kuchynski <akuchynski@chromium.org>\n    Reviewed-by: Benson Leung <bleung@chromium.org>\n    Link: https://patch.msgid.link/20260707141736.1635698-1-akuchynski@chromium.org\n    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>\n\n drivers/usb/typec/ucsi/ucsi.c | 82 ++++++++++++++++++++-----------------------\n 1 file changed, 39 insertions(+), 43 deletions(-)\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641446007,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The issue is that `typec_partner_link_device` can silently fail to create the link, but the removal code always attempts to unlink it anyway, causing the warning when the link doesn't exist. Looking at that commit about detaching Type-C connectors on component unbind reveals the asymmetry in how link creation and removal are handled.\n\nThere's also a potential stale pointer problem with `port->usb2_dev` after USB device removal, and I'm wondering if the partner attach is being called twice for the same partner, or if both usb2_dev and usb3_dev are pointing to the same device when the link gets created. I need to trace through the USB core side—specifically the component bind logic and how `usb_device_attach` and `usb_device_deattach` interact with the port code.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01L581ZCJH17Pge2TL7gA6Yu\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git show e0b291fe1179 | cat\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01L581ZCJH17Pge2TL7gA6Yu",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git show e0b291fe1179 | cat"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641456260,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01L581ZCJH17Pge2TL7gA6Yu",
+      "tool_name": "bash",
+      "content": "commit e0b291fe117964037e0ba382eff4bb365d531c3a\nAuthor: Chia-Lin Kao (AceLan) <acelan.kao@canonical.com>\nDate:   Thu Jun 11 15:12:01 2026 +0800\n\n    usb: core: port: Deattach Type-C connector on component unbind\n    \n    connector_unbind() is the mirror of connector_bind(), but it is missing\n    the symmetric call to typec_deattach() that connector_bind() makes via:\n    \n        if (port_dev->child)\n            typec_attach(port_dev->connector, &port_dev->child->dev);\n    \n    When a Thunderbolt dock is unplugged, two teardown paths race:\n    \n    1. The component framework calls connector_unbind() first, which sets\n       port_dev->connector = NULL without calling typec_deattach().  This\n       leaves port->usb2_dev/port->usb3_dev in struct typec_port pointing at\n       the USB device that is about to be freed.\n    \n    2. usb_disconnect() then calls typec_deattach(port_dev->connector, ...),\n       but port_dev->connector is already NULL, so the call is a no-op and\n       port->usb2_dev is never cleared.\n    \n    3. Concurrently, UCSI detects a PD partner-disconnect event and calls\n       typec_unregister_partner(), which reads port->usb2_dev (now a dangling\n       pointer to freed memory) and passes it to typec_partner_unlink_device()\n       -> sysfs_remove_link() -> dev_name() on the freed device, corrupting\n       the typec/UCSI partner state.\n    \n    This corruption leaves the Thunderbolt tunnel in an inconsistent state on\n    the next dock hot-plug.  On affected hardware the dock's I225/igc NIC fails\n    to enumerate: AER fires a slot reset while the igc driver is still\n    initialising (\"PCIe link lost\"), and the subsequent igc_reset attempt hits\n    igc_rd32 on an already-detached device:\n    \n        igc 0000:2e:00.0 eth0: PCIe link lost, device now detached\n        igc: Failed to read reg 0x0!\n        WARNING: CPU: 9 PID: 129 at drivers/net/ethernet/intel/igc/igc_main.c:7005\n                 igc_rd32+0xa4/0xc0 [igc]\n        Call Trace:\n         igc_disable_pcie_master+0x16/0xa0 [igc]\n         igc_reset_hw_base+0x14/0x170 [igc]\n         igc_reset+0x63/0x110 [igc]\n         igc_io_slot_reset+0x9e/0xd0 [igc]\n         report_slot_reset+0x5d/0xc0\n         pcie_do_recovery+0x209/0x400\n         aer_isr_one_error_type+0x235/0x430\n         aer_isr+0x4e/0x80\n         irq_thread+0xf4/0x1f0\n    \n    4. UCSI later handles the PD partner-disconnect and calls\n       typec_unregister_partner(), which still sees the stale port->usb2_dev\n       and tries to remove its sysfs link a second time:\n    \n       kernfs: can not remove 'typec', no directory\n       WARNING: CPU: 6 PID: 55 at fs/kernfs/dir.c:1706 kernfs_remove_by_name_ns+0xe9/0xf0\n       Workqueue: events ucsi_handle_connector_change [typec_ucsi]\n       Call Trace:\n        sysfs_remove_link+0x19/0x50\n        typec_unregister_partner+0x6e/0x120 [typec]\n        ucsi_unregister_partner+0x107/0x150 [typec_ucsi]\n        ucsi_handle_connector_change+0x3ec/0x490 [typec_ucsi]\n        process_one_work+0x18e/0x3e0\n        worker_thread+0x2e3/0x420\n        kthread+0x10a/0x230\n        ret_from_fork+0x121/0x140\n        ret_from_fork_asm+0x1a/0x30\n    \n       With worse timing the same stale pointer is dereferenced after the\n       backing memory is freed, turning the warning into a use-after-free.\n    \n    Fix the asymmetry: call typec_deattach() before clearing\n    port_dev->connector, matching what connector_bind() does on the bind side.\n    typec_partner_deattach() is already protected by port->partner_link_lock,\n    so it serialises safely with the concurrent typec_unregister_partner() path.\n    \n    Fixes: 11110783f5ea (\"usb: Inform the USB Type-C class about enumerated devices\")\n    Cc: stable <stable@kernel.org>\n    Signed-off-by: Chia-Lin Kao (AceLan) <acelan.kao@canonical.com>\n    Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>\n    Link: https://patch.msgid.link/20260611071201.1235545-1-acelan.kao@canonical.com\n    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>\n\ndiff --git a/drivers/usb/core/port.c b/drivers/usb/core/port.c\nindex b1364f0c384c..b4452b665f59 100644\n--- a/drivers/usb/core/port.c\n+++ b/drivers/usb/core/port.c\n@@ -740,6 +740,8 @@ static void connector_unbind(struct device *dev, struct device *connector, void\n \n \tsysfs_remove_link(&connector->kobj, dev_name(dev));\n \tsysfs_remove_link(&dev->kobj, \"connector\");\n+\tif (port_dev->child)\n+\t\ttypec_deattach(port_dev->connector, &port_dev->child->dev);\n \tport_dev->connector = NULL;\n }\n \n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641456261,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I'm checking whether this specific fix is already present in the current tree at HEAD, which is Linux 7.0.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01LBBmasFd1fgwr4myyX58RC\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git branch -a --contains e0b291fe1179 | cat; git tag --contains e0b291fe1179 | head; echo ===; sed -n 720,750p drivers/usb/core/port.c; echo ===; git log --oneline -1 HEAD; git describe --contains e0b291fe1179 2>&1\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01LBBmasFd1fgwr4myyX58RC",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git branch -a --contains e0b291fe1179 | cat; git tag --contains e0b291fe1179 | head; echo ===; sed -n 720,750p drivers/usb/core/port.c; echo ===; git log --oneline -1 HEAD; git describe --contains e0b291fe1179 2>&1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641472592,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01LBBmasFd1fgwr4myyX58RC",
+      "tool_name": "bash",
+      "content": "  remotes/origin/HEAD -> origin/master\n  remotes/origin/master\nv7.2\nv7.2-rc5\nv7.2-rc6\nv7.2-rc7\n===\n}\n\nstatic void connector_unbind(struct device *dev, struct device *connector, void *data)\n{\n\tstruct usb_port *port_dev = to_usb_port(dev);\n\n\tsysfs_remove_link(&connector->kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"connector\");\n\tport_dev->connector = NULL;\n}\n\nstatic const struct component_ops connector_ops = {\n\t.bind = connector_bind,\n\t.unbind = connector_unbind,\n};\n\nint usb_hub_create_port_device(struct usb_hub *hub, int port1)\n{\n\tstruct usb_port *port_dev;\n\tstruct usb_device *hdev = hub->hdev;\n\tint retval;\n\n\tport_dev = kzalloc_obj(*port_dev);\n\tif (!port_dev)\n\t\treturn -ENOMEM;\n\n\tport_dev->req = kzalloc_obj(*(port_dev->req));\n\tif (!port_dev->req) {\n\t\tkfree(port_dev);\n\t\treturn -ENOMEM;\n\t}\n===\n028ef9c96e96 Linux 7.0\nv7.2-rc5~7^2~10\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641472594,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I'm checking the working tree state at Linux 7.0 to confirm the fix isn't present yet in drivers/usb/core/port.c around line 728, then gathering the specific evidence from the connector_bind and typec_attach interactions in that file.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01BipEVDmKEnSEyCJD8B7zJg\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"typec_attach|typec_deattach|connector_bind\\\" drivers/usb/core/port.c include/linux/usb/typec.h drivers/usb/typec/class.c | head -30; echo ===; sed -n 1700,1712p fs/kernfs/dir.c; echo ===; rg -n \\\"partner_link_lock\\\" drivers/usb/typec/class.c drivers/usb/typec/class.h\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01BipEVDmKEnSEyCJD8B7zJg",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"typec_attach|typec_deattach|connector_bind\" drivers/usb/core/port.c include/linux/usb/typec.h drivers/usb/typec/class.c | head -30; echo ===; sed -n 1700,1712p fs/kernfs/dir.c; echo ===; rg -n \"partner_link_lock\" drivers/usb/typec/class.c drivers/usb/typec/class.h"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641477073,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01BipEVDmKEnSEyCJD8B7zJg",
+      "tool_name": "bash",
+      "content": "drivers/usb/core/port.c:695:static int connector_bind(struct device *dev, struct device *connector, void *data)\ndrivers/usb/core/port.c:717:\t\ttypec_attach(port_dev->connector, &port_dev->child->dev);\ndrivers/usb/core/port.c:732:\t.bind = connector_bind,\ninclude/linux/usb/typec.h:404:static inline void typec_attach(struct typec_connector *con, struct device *dev)\ninclude/linux/usb/typec.h:410:static inline void typec_deattach(struct typec_connector *con, struct device *dev)\n===\n\t\tWARN_ON_ONCE(!RB_EMPTY_NODE(&kn->rb));\n\t\tret = false;\n\t}\n\n\t/*\n\t * This must be done while kernfs_rwsem held exclusive; otherwise,\n\t * waiting for SUICIDED && deactivated could finish prematurely.\n\t */\n\tkernfs_unbreak_active_protection(kn);\n\n\tup_write(&root->kernfs_rwsem);\n\treturn ret;\n}\n===\ndrivers/usb/typec/class.h:64:\tstruct mutex\t\t\tpartner_link_lock;\ndrivers/usb/typec/class.c:1149:\tmutex_lock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:1153:\t\tmutex_unlock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:1162:\tmutex_unlock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:1183:\tmutex_lock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:1194:\tmutex_unlock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:2151:\tmutex_lock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:2166:\tmutex_unlock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:2174:\tmutex_lock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:2185:\tmutex_unlock(&port->partner_link_lock);\ndrivers/usb/typec/class.c:2746:\tmutex_init(&port->partner_link_lock);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641477074,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01MPBocCHGEEGUCCgKLhE1dw\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && grep -n \\\"kernfs_remove_by_name_ns\\\" -A20 fs/kernfs/dir.c | sed -n '1,60p'; echo ===; sed -n 690,720p drivers/usb/core/port.c; echo ===; sed -n 395,415p include/linux/usb/typec.h\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01MPBocCHGEEGUCCgKLhE1dw",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && grep -n \"kernfs_remove_by_name_ns\" -A20 fs/kernfs/dir.c | sed -n '1,60p'; echo ===; sed -n 690,720p drivers/usb/core/port.c; echo ===; sed -n 395,415p include/linux/usb/typec.h"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641479911,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01MPBocCHGEEGUCCgKLhE1dw",
+      "tool_name": "bash",
+      "content": "1715: * kernfs_remove_by_name_ns - find a kernfs_node by name and remove it\n1716- * @parent: parent of the target\n1717- * @name: name of the kernfs_node to remove\n1718- * @ns: namespace tag of the kernfs_node to remove\n1719- *\n1720- * Look for the kernfs_node with @name and @ns under @parent and remove it.\n1721- *\n1722- * Return: %0 on success, -ENOENT if such entry doesn't exist.\n1723- */\n1724:int kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n1725-\t\t\t     const struct ns_common *ns)\n1726-{\n1727-\tstruct kernfs_node *kn;\n1728-\tstruct kernfs_root *root;\n1729-\n1730-\tif (!parent) {\n1731-\t\tWARN(1, KERN_WARNING \"kernfs: can not remove '%s', no directory\\n\",\n1732-\t\t\tname);\n1733-\t\treturn -ENOENT;\n1734-\t}\n1735-\n1736-\troot = kernfs_root(parent);\n1737-\tdown_write(&root->kernfs_rwsem);\n1738-\n1739-\tkn = kernfs_find_ns(parent, name, ns);\n1740-\tif (kn) {\n1741-\t\tkernfs_get(kn);\n1742-\t\t__kernfs_remove(kn);\n1743-\t\tkernfs_put(kn);\n1744-\t}\n===\n\tpeer = peer_hub->ports[port1 - 1];\n\tif (peer && peer->location == 0)\n\t\tlink_peers_report(port_dev, peer);\n}\n\nstatic int connector_bind(struct device *dev, struct device *connector, void *data)\n{\n\tstruct usb_port *port_dev = to_usb_port(dev);\n\tint ret;\n\n\tret = sysfs_create_link(&dev->kobj, &connector->kobj, \"connector\");\n\tif (ret)\n\t\treturn ret;\n\n\tret = sysfs_create_link(&connector->kobj, &dev->kobj, dev_name(dev));\n\tif (ret) {\n\t\tsysfs_remove_link(&dev->kobj, \"connector\");\n\t\treturn ret;\n\t}\n\n\tport_dev->connector = data;\n\n\t/*\n\t * If there is already USB device connected to the port, letting the\n\t * Type-C connector know about it immediately.\n\t */\n\tif (port_dev->child)\n\t\ttypec_attach(port_dev->connector, &port_dev->child->dev);\n\n\treturn 0;\n}\n===\n * to be powered on.\n *\n * The attached (enumerated) devices will be liked with the typec-partner device.\n */\nstruct typec_connector {\n\tvoid (*attach)(struct typec_connector *con, struct device *dev);\n\tvoid (*deattach)(struct typec_connector *con, struct device *dev);\n};\n\nstatic inline void typec_attach(struct typec_connector *con, struct device *dev)\n{\n\tif (con && con->attach)\n\t\tcon->attach(con, dev);\n}\n\nstatic inline void typec_deattach(struct typec_connector *con, struct device *dev)\n{\n\tif (con && con->deattach)\n\t\tcon->deattach(con, dev);\n}\n\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641479912,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I should also verify that the usb_disconnect function properly calls typec_deattach.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_013u394HEVZQ3AJtJUyYp3yi\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"typec_deattach|usb_remove_device|connector\\\" drivers/usb/core/hub.c | head -20\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_013u394HEVZQ3AJtJUyYp3yi",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"typec_deattach|usb_remove_device|connector\" drivers/usb/core/hub.c | head -20"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641482623,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_013u394HEVZQ3AJtJUyYp3yi",
+      "tool_name": "bash",
+      "content": "1039: * usb_remove_device - disable a device's port on its parent hub\n1050:int usb_remove_device(struct usb_device *udev)\n2363:\t\ttypec_deattach(port_dev->connector, &udev->dev);\n2722:\t\ttypec_attach(port_dev->connector, &udev->dev);\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641482624,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01SYxnWpmVPPQ41bm9AWXiFC\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && sed -n 2355,2370p drivers/usb/core/hub.c; sed -n 55,70p drivers/usb/typec/class.h\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01SYxnWpmVPPQ41bm9AWXiFC",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && sed -n 2355,2370p drivers/usb/core/hub.c; sed -n 55,70p drivers/usb/typec/class.h"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641486160,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01SYxnWpmVPPQ41bm9AWXiFC",
+      "tool_name": "bash",
+      "content": "\n\t\t/*\n\t\t * As usb_port_runtime_resume() de-references udev, make\n\t\t * sure no resumes occur during removal\n\t\t */\n\t\tif (!test_and_set_bit(port1, hub->child_usage_bits))\n\t\t\tpm_runtime_get_sync(&port_dev->dev);\n\n\t\ttypec_deattach(port_dev->connector, &udev->dev);\n\t}\n\n\tusb_remove_ep_devs(&udev->ep0);\n\tusb_unlock_device(udev);\n\n\tif (udev->usb4_link)\n\t\tdevice_link_del(udev->usb4_link);\n\n\tint\t\t\t\tprefer_role;\n\tenum typec_data_role\t\tdata_role;\n\tenum typec_role\t\t\tpwr_role;\n\tenum typec_role\t\t\tvconn_role;\n\tenum typec_pwr_opmode\t\tpwr_opmode;\n\tenum typec_port_type\t\tport_type;\n\tenum usb_mode\t\t\tusb_mode;\n\tstruct mutex\t\t\tport_type_lock;\n\tstruct mutex\t\t\tpartner_link_lock;\n\n\tenum typec_orientation\t\torientation;\n\tbool\t\t\t\tmode_control;\n\tstruct typec_switch\t\t*sw;\n\tstruct typec_mux\t\t*mux;\n\tstruct typec_retimer\t\t*retimer;\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641486161,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "I need to write up the report documenting that this tree version 7.0 is missing the fix that landed in v7.2-rc5, referencing the specific commits involved, and noting that the Ubuntu OEM kernel 6.17.0-1011 also lacks the fix despite it being marked for stable backport. I should also point to the hub.c file around line 2363 where the detach operation occurs during USB disconnect.\n\nLooking at the disconnect flow more carefully, I see that usb_disconnect triggers typec_deattach at that location in hub.c. There's also a related issue in class.c where typec_partner_unlink_device removes the sysfs link, but the device object gets freed leaving the kobj with a NULL sd pointer, which causes problems when kernfs tries to remove it by name. I should verify how sysfs_remove_link handles the kobj.sd parameter to confirm this is where the warning originates.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01AADawrKBJhTjzncPgopBPb\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"void sysfs_remove_link\\\" -A10 fs/sysfs/symlink.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01AADawrKBJhTjzncPgopBPb",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"void sysfs_remove_link\" -A10 fs/sysfs/symlink.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641496430,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01AADawrKBJhTjzncPgopBPb",
+      "tool_name": "bash",
+      "content": "143:void sysfs_remove_link(struct kobject *kobj, const char *name)\n144-{\n145-\tstruct kernfs_node *parent = NULL;\n146-\n147-\tif (!kobj)\n148-\t\tparent = sysfs_root_kn;\n149-\telse\n150-\t\tparent = kobj->sd;\n151-\n152-\tkernfs_remove_by_name(parent, name);\n153-}\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641496431,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The parent pointer is null because the USB device's kobject was already removed—when `sysfs_remove_dir` is called, it sets `kobj->sd` to null, which I can verify in the sysfs directory code.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01JZJPdPnRJ4oYMjYVKKaSuw\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && rg -n \\\"void sysfs_remove_dir\\\" -A20 fs/sysfs/dir.c\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01JZJPdPnRJ4oYMjYVKKaSuw",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && rg -n \"void sysfs_remove_dir\" -A20 fs/sysfs/dir.c"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641500989,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01JZJPdPnRJ4oYMjYVKKaSuw",
+      "tool_name": "bash",
+      "content": "79:void sysfs_remove_dir(struct kobject *kobj)\n80-{\n81-\tstruct kernfs_node *kn = kobj->sd;\n82-\n83-\t/*\n84-\t * In general, kobject owner is responsible for ensuring removal\n85-\t * doesn't race with other operations and sysfs doesn't provide any\n86-\t * protection; however, when @kobj is used as a symlink target, the\n87-\t * symlinking entity usually doesn't own @kobj and thus has no\n88-\t * control over removal.  @kobj->sd may be removed anytime\n89-\t * and symlink code may end up dereferencing an already freed node.\n90-\t *\n91-\t * sysfs_symlink_target_lock synchronizes @kobj->sd\n92-\t * disassociation against symlink operations so that symlink code\n93-\t * can safely dereference @kobj->sd.\n94-\t */\n95-\tspin_lock(&sysfs_symlink_target_lock);\n96-\tkobj->sd = NULL;\n97-\tspin_unlock(&sysfs_symlink_target_lock);\n98-\n99-\tif (kn) {\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641500990,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "So the ENOENT error traces back to kobj->sd being NULL after the device is unregistered, which means the parent directory doesn't exist — that's what triggers the warning. The kernel tree here is at version 7.0, but the fix that addresses this (commit e0b291fe1179) didn't land until v7.2-rc5, so it's not present in this codebase yet. I should verify whether there's another related fix in that same area upstream that might be relevant.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01CW7PHQCvp3hZaFLHAuQb88\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --oneline --all -- drivers/usb/core/port.c | head -5; echo ===; git log --oneline v7.0..origin/master -- drivers/usb/core/port.c drivers/usb/typec/class.c | cat\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01CW7PHQCvp3hZaFLHAuQb88",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --oneline --all -- drivers/usb/core/port.c | head -5; echo ===; git log --oneline v7.0..origin/master -- drivers/usb/core/port.c drivers/usb/typec/class.c | cat"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641508900,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01CW7PHQCvp3hZaFLHAuQb88",
+      "tool_name": "bash",
+      "content": "e0b291fe1179 usb: core: port: Deattach Type-C connector on component unbind\nb84cc80610a8 usb: port: add delay after usb_hub_set_port_power()\n8020c41b39f5 usb: core: allow ACPI-managed hard-wired ports to power off\nbf4afc53b77a Convert 'alloc_obj' family to use the new default GFP_KERNEL argument\n69050f8d6d07 treewide: Replace kmalloc with kmalloc_obj for non-scalar types\n===\ne0b291fe1179 usb: core: port: Deattach Type-C connector on component unbind\n43ae2f90b70c usb: typec: class: drop PD lookup reference\n3723393cc284 Merge tag 'v7.0-rc7' into usb-next\nb84cc80610a8 usb: port: add delay after usb_hub_set_port_power()\n8020c41b39f5 usb: core: allow ACPI-managed hard-wired ports to power off\n"
+    },
+    {
+      "type": "assistant_tool_call",
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641508901,
+      "token_count": null,
+      "finish_reason": "toolUse",
+      "content": "The tree is at v7.0 while the fix I'm looking for is in v7.2-rc5, so I need to verify whether commit 11110783f5ea is actually present here. I'm also tracing the unbind path through typec_aggregate_unbind down to connector_unbind to get the specific line numbers as evidence.\n{\"type\": \"toolCall\", \"id\": \"toolu_bdrk_01NEbJ9PwTpweBRqeuJRU9mk\", \"name\": \"bash\", \"arguments\": {\"command\": \"cd /workspace/linux && git log --oneline -1 11110783f5ea | cat; git log --oneline -1 59de2a56d127|cat; grep -n \\\"\\\" drivers/usb/typec/class.c | sed -n '906,912p;1183,1195p'; grep -n \\\"\\\" drivers/usb/core/port.c | sed -n '722,730p'\"}}",
+      "tool_calls": [
+        {
+          "tool_call_id": "toolu_bdrk_01NEbJ9PwTpweBRqeuJRU9mk",
+          "name": "bash",
+          "arguments": {
+            "command": "cd /workspace/linux && git log --oneline -1 11110783f5ea | cat; git log --oneline -1 59de2a56d127|cat; grep -n \"\" drivers/usb/typec/class.c | sed -n '906,912p;1183,1195p'; grep -n \"\" drivers/usb/core/port.c | sed -n '722,730p'"
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_result",
+      "id": null,
+      "role": "toolResult",
+      "timestamp": 1787641514244,
+      "token_count": null,
+      "finish_reason": null,
+      "tool_call_id": "toolu_bdrk_01NEbJ9PwTpweBRqeuJRU9mk",
+      "tool_name": "bash",
+      "content": "11110783f5ea usb: Inform the USB Type-C class about enumerated devices\n59de2a56d127 usb: typec: Link enumerated USB devices with Type-C partner\n906:static void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\n907:{\n908:\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n909:\tsysfs_remove_link(&dev->kobj, \"typec\");\n910:\n911:\tif (partner->deattach)\n912:\t\tpartner->deattach(partner, dev);\n1183:\tmutex_lock(&port->partner_link_lock);\n1184:\tif (port->usb2_dev) {\n1185:\t\ttypec_partner_unlink_device(partner, port->usb2_dev);\n1186:\t\tport->usb2_dev = NULL;\n1187:\t}\n1188:\tif (port->usb3_dev) {\n1189:\t\ttypec_partner_unlink_device(partner, port->usb3_dev);\n1190:\t\tport->usb3_dev = NULL;\n1191:\t}\n1192:\n1193:\tdevice_unregister(&partner->dev);\n1194:\tmutex_unlock(&port->partner_link_lock);\n1195:}\n722:static void connector_unbind(struct device *dev, struct device *connector, void *data)\n723:{\n724:\tstruct usb_port *port_dev = to_usb_port(dev);\n725:\n726:\tsysfs_remove_link(&connector->kobj, dev_name(dev));\n727:\tsysfs_remove_link(&dev->kobj, \"connector\");\n728:\tport_dev->connector = NULL;\n729:}\n730:\n"
+    },
+    {
+      "id": null,
+      "role": "assistant",
+      "timestamp": 1787641514245,
+      "token_count": null,
+      "finish_reason": "stop",
+      "type": "final_answer",
+      "content": "I've gathered all the evidence and need to write up the report. The fix in question landed in Linux v7.2-rc5, but the current tree is at v7.0, so it's not present here—though it is available in origin/master. I've confirmed that the working tree's drivers/usb/core/port.c file is indeed missing the typec_deattach code at lines 722-729.\n\nThe kernel version 6.17.0-1011-oem predates this fix as well. There's also a related fix (7aa7d4bf9d3f) for ucsi port unregistration, and I've verified that another related commit (66e1a887273c) is already present in this tree at lines 1184-1191.\n## Verdict\n\nRoot cause is **not** in UCSI — UCSI is only the *reporter*. The bug is an **asymmetry in `drivers/usb/core/port.c:connector_unbind()`**, which leaves `struct typec_port::usb2_dev` / `usb3_dev` pointing at a USB device that has already been removed/freed. UCSI then does the second, bogus `sysfs_remove_link()` on that stale device and kernfs warns.\n\nAn upstream fix exists: **`e0b291fe1179 \"usb: core: port: Deattach Type-C connector on component unbind\"`** (Chia-Lin Kao (AceLan), Canonical; `Fixes: 11110783f5ea`, `Cc: stable`). It is merged in **v7.2-rc5** (`git describe --contains` → `v7.2-rc5~7^2~10`) and is **absent from this tree** (HEAD = `028ef9c96e96 Linux 7.0`) and absent from 6.17.0-1011-oem unless backported.\n\n## The chain, with file:line evidence\n\n1. **Link creation (bind side is symmetric):**\n   - `drivers/usb/core/port.c:695-719` `connector_bind()` sets `port_dev->connector` and, if a device is already enumerated, calls `typec_attach(port_dev->connector, &port_dev->child->dev)` (`:717`).\n   - `include/linux/usb/typec.h:404-408` `typec_attach()` → `con->attach()` → `drivers/usb/typec/class.c:2143` `typec_partner_attach()`, which records `port->usb2_dev = dev` / `port->usb3_dev = dev` (`class.c:2154-2159`) and creates the links via `typec_partner_link_device()` (`class.c:888-902`, symlink name `\"typec\"` at `class.c:892`).\n\n2. **The offending function — unbind side is NOT symmetric (in this tree):**\n   - `drivers/usb/core/port.c:722-729` `connector_unbind()` removes only its own two links and then does `port_dev->connector = NULL;` (`:728`) **without calling `typec_deattach()`**. So `port->usb2_dev`/`usb3_dev` in `struct typec_port` (`drivers/usb/typec/class.h`, protected by `partner_link_lock` at `class.h:64`) keep a dangling pointer.\n   - The normal disconnect path that *would* clear it, `drivers/usb/core/hub.c:2363` `typec_deattach(port_dev->connector, &udev->dev)`, becomes a **no-op**, because `include/linux/usb/typec.h:405/411` bail out on `con == NULL` — and `connector_unbind()` already NULLed it. `typec_partner_deattach()` (`class.c:2171-2186`), which is what clears `port->usb2_dev/usb3_dev` (`class.c:2181-2184`), is therefore never run.\n\n3. **UCSI later tears down the partner and hits the stale pointer:**\n   - Workqueue `events`, `ucsi_handle_connector_change()` (`drivers/usb/typec/ucsi/ucsi.c:1264`, registered at `:1632`) → on disconnect `ucsi_unregister_partner(con)` (`ucsi.c:1325`, also `:1221`, `:1912`, `:2147`).\n   - `ucsi_unregister_partner()` (`ucsi.c:1138-1153`) calls `typec_unregister_partner(con->partner)` (`ucsi.c:1151`).\n   - `typec_unregister_partner()` (`class.c:1174-1195`) takes `partner_link_lock` and, because `port->usb2_dev` is still non-NULL (stale), calls `typec_partner_unlink_device(partner, port->usb2_dev)` (`class.c:1185`, and `:1189` for usb3).\n\n4. **Why kernfs returns -ENOENT / \"no directory\":**\n   - `typec_partner_unlink_device()` (`class.c:906-912`) does `sysfs_remove_link(&partner->dev.kobj, dev_name(dev))` (`:908`) and `sysfs_remove_link(&dev->kobj, \"typec\")` (`:909`) on the *already-removed* USB device.\n   - `fs/sysfs/symlink.c:143-153` `sysfs_remove_link()` passes `kobj->sd` as the kernfs parent.\n   - For a device that already went through `device_del()`, `fs/sysfs/dir.c:79-97` `sysfs_remove_dir()` has already done `kobj->sd = NULL` (`:96`) under `sysfs_symlink_target_lock`.\n   - So `parent == NULL` reaches `fs/kernfs/dir.c:1724-1734` `kernfs_remove_by_name_ns()`, which hits `if (!parent) { WARN(1, \"kernfs: can not remove '%s', no directory\\n\", name); return -ENOENT; }` — i.e. exactly `fs/kernfs/dir.c:1706`-region warning with `name == \"typec\"` and the `sysfs_remove_link → typec_unregister_partner → ucsi_unregister_partner → ucsi_handle_connector_change` backtrace you observed. (Line 1706 vs 1731 differs only because of the older 6.17 source layout.)\n   - Note also `dev_name(dev)` at `class.c:908` dereferences the freed `struct device`; with worse timing this is a use-after-free, not just a warning. That is what corrupts the TBT/dock state (the igc AER/slot-reset fallout described in the upstream commit).\n\n## The upstream fix\n\n`e0b291fe1179` adds the missing mirror call, so the connector state is cleared *before* the connector pointer is dropped:\n\n```c\n \tsysfs_remove_link(&connector->kobj, dev_name(dev));\n \tsysfs_remove_link(&dev->kobj, \"connector\");\n+\tif (port_dev->child)\n+\t\ttypec_deattach(port_dev->connector, &port_dev->child->dev);\n \tport_dev->connector = NULL;\n```\n\nThis runs `typec_partner_deattach()` under `port->partner_link_lock` (`class.c:2174`), so it serialises correctly against the concurrent `typec_unregister_partner()` (`class.c:1183`) and NULLs `usb2_dev`/`usb3_dev` before UCSI can look at them.\n\n## Related fixes (status in this tree)\n\n- `66e1a887273c \"usb: typec: class: Invalidate USB device pointers on partner unregistration\"` — **already present** (`class.c:1186`, `:1190`). It only makes `typec_unregister_partner()` idempotent; it cannot help when the pointer is stale *on entry*, which is this bug.\n- `7aa7d4bf9d3f \"usb: typec: ucsi: Fix race condition and ordering in port unregistration\"` (v7.2 era) and `fb0bf289f5d5` — UCSI teardown-ordering/UAF fixes; complementary, also **not in this v7.0 tree**.\n\n## Recommendation\n\nBackport `e0b291fe1179` (one-liner, `Cc: stable`, applies cleanly on `drivers/usb/core/port.c:722-729`) into the 6.17-oem kernel; optionally also `7aa7d4bf9d3f` if UCSI teardown crashes are seen. No change is needed in `drivers/usb/typec/ucsi/*` for this specific warning."
+    }
+  ],
+  "aggregate": {
+    "message_count": 46,
+    "tool_call_count": 22,
+    "api_call_count": 23,
+    "input_tokens": 46,
+    "output_tokens": 8793,
+    "cache_read_tokens": 357296,
+    "cache_write_tokens": 25097,
+    "reasoning_tokens": 3703,
+    "total_tokens": 391232,
+    "estimated_cost_usd": 0.55555925
+  },
+  "summary": {
+    "iterations": 23,
+    "tool_calls": 22
+  }
+}
