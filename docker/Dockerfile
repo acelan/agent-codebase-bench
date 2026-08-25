@@ -125,6 +125,23 @@ RUN chmod +x /usr/local/bin/pi-bench-run \
  && python3 -m venv /opt/bench-venv \
  && /opt/bench-venv/bin/pip install --no-cache-dir pyyaml
 
+# --- harness freshness stamp -------------------------------------------------
+# The .py files above are baked in at build time: editing pi_aggregate.py /
+# pi_report.py / etc. on the host has ZERO effect on already-built images
+# until a rebuild. That silent staleness has bitten us before (a script fix
+# landed, benchmarks kept re-running against the OLD baked-in aggregator, and
+# report.html silently missed fields like sd= for days). Stamp a hash of the
+# CONTENT of the harness files (concatenated in a fixed order, no paths --
+# paths differ between the image and a host checkout so must not be part of
+# the hash) at build time so bench_pi.py can detect + warn when the image in
+# use predates the local source (see bench_pi.py:check_image_freshness, which
+# must concatenate the same files in the same order).
+RUN cat /opt/pi-bench/pi_stream.py /opt/pi-bench/pi_transcript.py \
+        /opt/pi-bench/pi_runner.py /opt/pi-bench/pi_versions.py \
+        /opt/pi-bench/pi_aggregate.py /opt/pi-bench/pi_summary.py \
+        /opt/pi-bench/pi_report.py /opt/pi-bench/bench_pi.py \
+    | sha256sum | awk '{print $1}' > /opt/pi-bench/.harness-sha256
+
 WORKDIR /workspace/linux
 
 # Default: run pi with whatever args the caller passes (e.g.

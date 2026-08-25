@@ -83,9 +83,20 @@ artifacts/result-summary.json                        cached LLM report analysis 
 set -a; . docker/.env; set +a  # exports OPENROUTER_API_KEY, PI_MODEL, optional PI_SUMMARY_MODEL, REPOWISE_*, OLLAMA_*
 
 # build the single image (does not build indexes)
-# NOTE: docker/*.sh are COPIED into the image at build time (Dockerfile).
-# After editing any docker/ script you MUST rebuild before the change takes
-# effect in a container — the pi-bench-index run below does NOT re-read them.
+# NOTE: docker/*.sh AND the pi_*.py / bench_pi.py harness are COPIED into the
+# image at build time (Dockerfile). After editing any of them you MUST
+# rebuild before the change takes effect in a container -- the
+# pi-bench-index run below does NOT re-read them, and neither does an
+# in-image `pi-bench-run`. bench_pi.py's --backend docker path now checks a
+# baked-in .harness-sha256 stamp against the local checkout and prints a
+# WARNING (not a hard failure) when they diverge, e.g.:
+#   [freshness] WARNING: agent-codebase-bench's baked-in pi_*.py/bench_pi.py
+#   differ from the local checkout ... rebuild: docker build -t ...
+# Heed that warning -- it means the container is about to run OLD script
+# logic (this is exactly how the sd= stdev field went silently missing from
+# report.html for a while: the fix was committed but the image was never
+# rebuilt). The in-image entrypoint (`pi-bench-run` inside a container) can't
+# warn about itself, so always rebuild first when in doubt.
 docker build -t agent-codebase-bench -f docker/Dockerfile .
 
 # build missing indexes into the host-mounted artifacts/indexes directory

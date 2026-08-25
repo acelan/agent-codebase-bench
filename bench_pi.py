@@ -45,6 +45,75 @@ def now_ts():
     return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
 
 
+# Harness .py files baked into the Docker image (must match docker/Dockerfile's
+# COPY + hash-stamp step, in the same order).
+_HARNESS_FILES = [
+    "pi_stream.py", "pi_transcript.py", "pi_runner.py", "pi_versions.py",
+    "pi_aggregate.py", "pi_summary.py", "pi_report.py", "bench_pi.py",
+]
+
+
+def _local_harness_sha256():
+    """Hash the harness .py files exactly like the Dockerfile's stamp step
+    (cat file1 file2 ... | sha256sum -- content only, no paths, fixed order)."""
+    import hashlib
+    here = os.path.dirname(os.path.abspath(__file__))
+    h = hashlib.sha256()
+    for name in _HARNESS_FILES:
+        with open(os.path.join(here, name), "rb") as f:
+            h.update(f.read())
+    return h.hexdigest()
+
+
+def check_image_freshness(image, backend):
+    """Warn loudly if the docker image predates the local harness source.
+
+    docker/Dockerfile COPYs pi_*.py / bench_pi.py into the image at build
+    time, so editing those files on the host has NO effect on a
+    already-built image until it is rebuilt. This has silently produced
+    stale reports before (a script fix landed, but every benchmark run kept
+    executing the OLD baked-in pi_aggregate.py, so e.g. report.html quietly
+    missed the new sd= field for days). Comparing the image's baked
+    .harness-sha256 against a hash computed the same way from the current
+    checkout catches that class of staleness before a run wastes API calls
+    on it. Best-effort: any failure here (docker not installed, image not
+    built yet, mismatched hash algorithm after a future Dockerfile edit)
+    only prints a warning and never blocks the run.
+    """
+    if backend != "docker":
+        return
+    import subprocess
+    try:
+        image_sha = subprocess.run(
+            ["docker", "run", "--rm", "--entrypoint", "cat", image,
+             "/opt/pi-bench/.harness-sha256"],
+            capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+    except Exception as e:
+        print(f"[freshness] could not probe {image}'s baked harness hash "
+              f"({e}); skipping staleness check", file=sys.stderr)
+        return
+    if not image_sha:
+        print(f"[freshness] {image} has no .harness-sha256 stamp (built "
+              "before this check existed) -- rebuild to enable it: "
+              "docker build -t agent-codebase-bench -f docker/Dockerfile .",
+              file=sys.stderr)
+        return
+    local_sha = _local_harness_sha256()
+    if image_sha != local_sha:
+        print(
+            f"[freshness] WARNING: {image}'s baked-in pi_*.py/bench_pi.py "
+            f"differ from the local checkout (image={image_sha[:12]} "
+            f"local={local_sha[:12]}). The container will run the OLD "
+            "harness code -- any fix you made since the image was last "
+            "built (e.g. to pi_aggregate.py or pi_report.py) will NOT take "
+            "effect until you rebuild:\n"
+            "    docker build -t agent-codebase-bench -f docker/Dockerfile .\n"
+            "Proceeding anyway; results may not reflect the current source.",
+            file=sys.stderr,
+        )
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", default="benchmark.yaml")
@@ -118,6 +187,7 @@ def main():
     model_root = os.path.join(base_dir, f"{flat_model}-{cfg['provider']}")
 
     if not args.aggregate_only:
+        check_image_freshness(pi_runner.BENCH_IMAGE, args.backend)
         print(f"backend={args.backend} model={cfg['model']} tools={tools} "
               f"prompts={[p['id'] for p in prompts]} runs={args.runs} "
               f"store={model_root}")
