@@ -36,6 +36,7 @@ import pi_summary
 BASE_COLS = [
     ("total", "tokens", True),
     ("in", "in", True),
+    ("cache", "cache read", True),
     ("out", "out", True),
     ("api", "api", True),
     ("wall_s", "elapsed (s)", True),
@@ -127,19 +128,21 @@ def load_cells(artifacts, instructions=None):
                 rl = p.get("run_log") or []
                 if rl and all(not r.get("transcript") for r in rl):
                     continue
-                # Keep cache/reasoning available for the narrative summary even
-                # though the compact comparison table does not display them.
+                # Keep reasoning available for the narrative summary even
+                # though the compact comparison table does not display it.
                 cells = {k: _mean(p.get(k)) for k, _, _ in BASE_COLS}
-                cells.update({k: _mean(p.get(k)) for k in ("cache", "reas")})
+                cells.update({k: _mean(p.get(k)) for k in ("reas",)})
                 # Run count each displayed mean rests on (mirrors summary.json's
                 # per-metric n) so tables can show "mean (n=N)" like report.md.
                 cell_n = {}
                 cell_sd = {}
+                cell_runs = {}
                 for k, _, _ in BASE_COLS:
                     stats = p.get(k)
                     if isinstance(stats, dict):
                         cell_n[k] = stats.get("n")
                         cell_sd[k] = stats.get("stdev")
+                        cell_runs[k] = stats.get("runs")
                 yield {
                     "model": model,
                     "model_root": mr,
@@ -151,6 +154,7 @@ def load_cells(artifacts, instructions=None):
                     "cells": cells,
                     "cell_n": cell_n,
                     "cell_sd": cell_sd,
+                    "cell_runs": cell_runs,
                     "summary": s,
                     "pprompt": p,
                 }
@@ -222,18 +226,22 @@ def load_iterations(model_root, tid, p):
     for e in trace.get("events", []):
         t = e.get("type")
         if t == "assistant_tool_call":
-            cur = {"calls": e.get("tool_calls") or [], "results": [], "final": None}
+            cur = {"calls": e.get("tool_calls") or [], "results": [],
+                   "final": None, "usage": e.get("usage")}
             iters.append(cur)
         elif t == "tool_result":
             if cur is None:
-                cur = {"calls": [], "results": [], "final": None}
+                cur = {"calls": [], "results": [], "final": None, "usage": None}
                 iters.append(cur)
             cur["results"].append(e)
         elif t == "final_answer":
             if cur is not None and cur["final"] is None:
                 cur["final"] = e
+                if cur.get("usage") is None:
+                    cur["usage"] = e.get("usage")
             else:
-                iters.append({"calls": [], "results": [], "final": e})
+                iters.append({"calls": [], "results": [], "final": e,
+                              "usage": e.get("usage")})
                 cur = None
     return iters
 
@@ -322,7 +330,7 @@ def _results_summary_html(findings, unavailable=None):
     return "".join(sections)
 
 
-def _cell_html(value, key, best, worst, n=None, sd=None):
+def _cell_html(value, key, best, worst, n=None, sd=None, runs=None):
     if value is None:
         return "<td class='num'>—</td>"
     style = ""
@@ -332,10 +340,24 @@ def _cell_html(value, key, best, worst, n=None, sd=None):
     elif value == worst and worst != best:
         style = "worst"
     fmt = fmt_num(value)
+    mark = ""
     if n is not None:
         mark = f"n={n}"
         if sd is not None:
             mark += f", sd={fmt_num(sd)}"
+    if runs:
+        # Click to reveal the individual per-run values behind this mean.
+        rows_html = "".join(
+            f"<tr><td>{_esc(r.get('run_ts'))}</td>"
+            f"<td class='num'>{fmt_num(r.get('value'))}</td></tr>"
+            for r in runs
+        )
+        detail = (f"<details class='runvals'><summary>{fmt} "
+                  f"<span class='mrk'>({mark})</span></summary>"
+                  f"<table class='rv'><thead><tr><th>run</th><th>value</th>"
+                  f"</tr></thead><tbody>{rows_html}</tbody></table></details>")
+        return f"<td class='num {style}'>{detail}</td>"
+    if mark:
         fmt += f" <span class='mrk'>({mark})</span>"
     return f"<td class='num {style}'>{fmt}</td>"
 
@@ -448,7 +470,8 @@ def _group_html(prompt, rows):
             best, worst = _best_worst(prompt_rows, key)
             tds.append(_cell_html(r["cells"].get(key), key, best, worst,
                                   (r.get("cell_n") or {}).get(key),
-                                  (r.get("cell_sd") or {}).get(key)))
+                                  (r.get("cell_sd") or {}).get(key),
+                                  (r.get("cell_runs") or {}).get(key)))
         trows.append("<tr>" + "".join(tds) + "</tr>")
     h.append("<table class='grp'><thead>" + thead + "</thead><tbody>"
              + "".join(trows) + "</tbody></table>")
@@ -467,15 +490,37 @@ def _group_html(prompt, rows):
     return "".join(h)
 
 
+def _usage_html(u):
+    """Clickable per-request usage badge: collapsed summary, expand for detail."""
+    if not u:
+        return ""
+    total = u.get("totalTokens")
+    summary = f"usage: {fmt_num(total)} tok" if total is not None else "usage"
+    rows = [
+        ("input", u.get("input")), ("output", u.get("output")),
+        ("cacheRead", u.get("cacheRead")), ("cacheWrite", u.get("cacheWrite")),
+        ("reasoning", u.get("reasoning")), ("totalTokens", u.get("totalTokens")),
+    ]
+    cost = (u.get("cost") or {}).get("total")
+    if cost is not None:
+        rows.append(("cost_usd", round(cost, 6)))
+    lines = "\n".join(f"{k}: {fmt_num(v) if isinstance(v, (int, float)) else v}"
+                      for k, v in rows if v is not None)
+    return (f"<details class='usage'><summary>{_esc(summary)}</summary>"
+            f"<pre>{_esc(lines)}</pre></details>")
+
+
 def _iteration_html(idx, it):
+    usage_html = _usage_html(it.get("usage"))
     if it["final"] is not None:
         title = "final answer"
-        inner = "<div class='answer'><pre>" + _esc(it["final"].get("content")) + "</pre></div>"
+        inner = ("<div class='answer'><pre>" + _esc(it["final"].get("content")) + "</pre></div>"
+                 + usage_html)
         return title, inner
     calls = it["calls"]
     results = it["results"]
     title = f"iteration {idx} — {len(calls)} call(s), {len(results)} result(s)"
-    inner = []
+    inner = [usage_html]
     for tc in calls:
         inner.append("<div class='call'><code>" + _esc(tc.get("name")) + "</code>"
                      "<pre>" + _esc(_args(tc.get("arguments"))) + "</pre></div>")
@@ -513,6 +558,17 @@ def _page(title, body):
             "ul.tools{padding-left:1.4em}.tools li{margin:0.35em 0}"
             ".finding{background:#f7f9fb;border-left:4px solid #6b8afd;"
             "padding:8px 12px;line-height:1.45}"
+            ".usage{display:inline-block;margin:2px 0 6px;padding:2px 6px;"
+            "font-size:11px;border:1px solid #ccd6e8;background:#eef2fb;"
+            "border-radius:10px}.usage summary{font-weight:500;color:#3a4a6b}"
+            ".usage pre{margin-top:4px;max-height:160px}"
+            "details.runvals{display:inline-block;border:none;padding:0;margin:0;"
+            "background:none}details.runvals summary{cursor:pointer;font-weight:inherit;"
+            "list-style:none;display:inline}"
+            "details.runvals summary::-webkit-details-marker{display:none}"
+            "details.runvals[open] summary{color:#3a4a6b}"
+            "table.rv{width:auto;margin:4px 0 0 auto;font-size:11px}"
+            "table.rv td,table.rv th{padding:3px 6px}"
             "</style></head><body>" + body + "</body></html>")
 
 

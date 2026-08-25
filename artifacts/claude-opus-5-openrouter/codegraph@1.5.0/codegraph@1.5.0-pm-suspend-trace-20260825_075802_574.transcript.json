@@ -36,7 +36,22 @@
             "query": "i915_pm_runtime_suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 127,
+        "cacheRead": 963,
+        "cacheWrite": 186,
+        "reasoning": 0,
+        "totalTokens": 1278,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.0031750000000000003,
+          "cacheRead": 0.0004815,
+          "cacheWrite": 0.0011625,
+          "total": 0.004829
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -83,7 +98,22 @@
             "query": "intel_display_driver_suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 290,
+        "cacheRead": 1149,
+        "cacheWrite": 22214,
+        "reasoning": 179,
+        "totalTokens": 23655,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.00725,
+          "cacheRead": 0.0005744999999999999,
+          "cacheWrite": 0.1388375,
+          "total": 0.146672
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -114,7 +144,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "I've identified some key naming differences in this codebase—the display suspend function was renamed and the runtime suspend callback uses a different name than expected. Now I can provide an accurate answer based on these findings.\n## Findings\n\n### 1. PCI PM callbacks reaching `i915_pm_suspend`\n\n`i915_pm_ops` (drivers/gpu/drm/i915/i915_driver.c:1713) wires `i915_pm_suspend` into **two** slots:\n\n```\n.suspend  = i915_pm_suspend      (line 1719)\n.poweroff = i915_pm_suspend      (line 1745)\n```\n\nFull chains from the PCI core (drivers/pci/pci-driver.c):\n\n```\npci_pm_suspend   → i915_pm_ops.suspend  → i915_pm_suspend → i915_drm_suspend(&i915->drm)\npci_pm_poweroff  → i915_pm_ops.poweroff → i915_pm_suspend → i915_drm_suspend(&i915->drm)\n```\n\n`i915_pm_suspend` (i915_driver.c:1392) body:\n1. `kdev_to_i915(kdev)` → `dev_get_drvdata` → `to_i915`\n2. NULL check → `-ENODEV`\n3. `switch_power_state == DRM_SWITCH_POWER_OFF` → early `return 0`\n4. `i915_drm_suspend(&i915->drm)`\n\nRelated-but-distinct chains that do **not** go through `i915_pm_suspend`:\n- `pci_pm_suspend_late` → `i915_pm_suspend_late` → `i915_drm_suspend_late(dev, false)`\n- `pci_pm_suspend_noirq` → `i915_pm_suspend_noirq` → `i915_drm_suspend_noirq(dev, false)`\n- `pci_pm_poweroff_late/noirq` → `i915_pm_poweroff_late/noirq` → same helpers with `hibernation = true`\n\n(codegraph also lists `platform_pm_suspend`, `scmi_pm_suspend`, `ishtp_cl_device_suspend`, `__pnp_bus_suspend`, `do_scsi_suspend/poweroff` as \"callers\" — those are generic `dev_pm_ops.suspend` indirect-call sites, not i915-specific paths.)\n\n### 2. Callers that also call `i915_pm_runtime_suspend`\n\n**None — `i915_pm_runtime_suspend` does not exist in this tree.** The runtime PM slot is filled by a display-side function:\n\n```\n.runtime_suspend = intel_runtime_suspend   (i915_driver.c:1752)\n.runtime_resume  = intel_runtime_resume    (i915_driver.c:1753)\n```\n\n`pci_pm_runtime_suspend` → `intel_runtime_suspend` is a completely separate entry point; neither `pci_pm_suspend` nor `pci_pm_poweroff` reaches it, and no i915 PM callback calls both the system-suspend and runtime-suspend paths.\n\n### 3. `dev_priv` data flow: `i915_drm_suspend` → display suspend\n\n`intel_display_suspend` has been renamed; the target is now **`intel_display_driver_suspend`** (drivers/gpu/drm/i915/display/intel_display_driver.c:684). The flow no longer passes `dev_priv` — it passes an `intel_display *`:\n\n```\ni915_pm_suspend(struct device *kdev)\n  │  i915 = kdev_to_i915(kdev)            // dev_get_drvdata → to_i915\n  ▼\ni915_drm_suspend(struct drm_device *dev)                    [i915_driver.c:1103]\n  │  dev_priv = to_i915(dev)              // line 1105  — container_of(dev)\n  │  display  = dev_priv->display         // line 1106  — the handoff point\n  │\n  ├─ disable_rpm_wakeref_asserts(&dev_priv->runtime_pm)     // dev_priv used directly\n  ├─ intel_power_domains_disable(display)\n  ├─ intel_display_driver_disable_user_access(display)\n  ├─ intel_display_driver_suspend(display)  ◄── line 1120\n  ├─ intel_irq_suspend(dev_priv)                            // dev_priv\n  ├─ i915_ggtt_suspend(to_gt(dev_priv)->ggtt)               // dev_priv → gt → ggtt\n  ├─ opregion_target_state = suspend_to_idle(dev_priv) ...  // dev_priv\n  ├─ dev_priv->suspend_count++\n  └─ i915_gem_drain_freed_objects(dev_priv)\n```\n\nInside `intel_display_driver_suspend(display)` only `display` is used:\n- `HAS_DISPLAY(display)` → early `return 0`\n- `drm_atomic_helper_suspend(display->drm)` — `display->drm` is the same `drm_device` originally passed to `i915_drm_suspend`\n- `display->restore.modeset_state = state` (saved for resume)\n- `flush_workqueue(display->wq.cleanup)`\n- `intel_dp_mst_suspend(display)`\n\n**Summary of the dataflow:** `struct device *kdev` → drvdata → `drm_i915_private *dev_priv` → `dev_priv->display` (`struct intel_display *`) → `display->drm` (back to the original `drm_device`). So `dev_priv` itself stops at `i915_drm_suspend`; the display layer receives only the decoupled `intel_display` handle."
+      "content": "I've identified some key naming differences in this codebase—the display suspend function was renamed and the runtime suspend callback uses a different name than expected. Now I can provide an accurate answer based on these findings.\n## Findings\n\n### 1. PCI PM callbacks reaching `i915_pm_suspend`\n\n`i915_pm_ops` (drivers/gpu/drm/i915/i915_driver.c:1713) wires `i915_pm_suspend` into **two** slots:\n\n```\n.suspend  = i915_pm_suspend      (line 1719)\n.poweroff = i915_pm_suspend      (line 1745)\n```\n\nFull chains from the PCI core (drivers/pci/pci-driver.c):\n\n```\npci_pm_suspend   → i915_pm_ops.suspend  → i915_pm_suspend → i915_drm_suspend(&i915->drm)\npci_pm_poweroff  → i915_pm_ops.poweroff → i915_pm_suspend → i915_drm_suspend(&i915->drm)\n```\n\n`i915_pm_suspend` (i915_driver.c:1392) body:\n1. `kdev_to_i915(kdev)` → `dev_get_drvdata` → `to_i915`\n2. NULL check → `-ENODEV`\n3. `switch_power_state == DRM_SWITCH_POWER_OFF` → early `return 0`\n4. `i915_drm_suspend(&i915->drm)`\n\nRelated-but-distinct chains that do **not** go through `i915_pm_suspend`:\n- `pci_pm_suspend_late` → `i915_pm_suspend_late` → `i915_drm_suspend_late(dev, false)`\n- `pci_pm_suspend_noirq` → `i915_pm_suspend_noirq` → `i915_drm_suspend_noirq(dev, false)`\n- `pci_pm_poweroff_late/noirq` → `i915_pm_poweroff_late/noirq` → same helpers with `hibernation = true`\n\n(codegraph also lists `platform_pm_suspend`, `scmi_pm_suspend`, `ishtp_cl_device_suspend`, `__pnp_bus_suspend`, `do_scsi_suspend/poweroff` as \"callers\" — those are generic `dev_pm_ops.suspend` indirect-call sites, not i915-specific paths.)\n\n### 2. Callers that also call `i915_pm_runtime_suspend`\n\n**None — `i915_pm_runtime_suspend` does not exist in this tree.** The runtime PM slot is filled by a display-side function:\n\n```\n.runtime_suspend = intel_runtime_suspend   (i915_driver.c:1752)\n.runtime_resume  = intel_runtime_resume    (i915_driver.c:1753)\n```\n\n`pci_pm_runtime_suspend` → `intel_runtime_suspend` is a completely separate entry point; neither `pci_pm_suspend` nor `pci_pm_poweroff` reaches it, and no i915 PM callback calls both the system-suspend and runtime-suspend paths.\n\n### 3. `dev_priv` data flow: `i915_drm_suspend` → display suspend\n\n`intel_display_suspend` has been renamed; the target is now **`intel_display_driver_suspend`** (drivers/gpu/drm/i915/display/intel_display_driver.c:684). The flow no longer passes `dev_priv` — it passes an `intel_display *`:\n\n```\ni915_pm_suspend(struct device *kdev)\n  │  i915 = kdev_to_i915(kdev)            // dev_get_drvdata → to_i915\n  ▼\ni915_drm_suspend(struct drm_device *dev)                    [i915_driver.c:1103]\n  │  dev_priv = to_i915(dev)              // line 1105  — container_of(dev)\n  │  display  = dev_priv->display         // line 1106  — the handoff point\n  │\n  ├─ disable_rpm_wakeref_asserts(&dev_priv->runtime_pm)     // dev_priv used directly\n  ├─ intel_power_domains_disable(display)\n  ├─ intel_display_driver_disable_user_access(display)\n  ├─ intel_display_driver_suspend(display)  ◄── line 1120\n  ├─ intel_irq_suspend(dev_priv)                            // dev_priv\n  ├─ i915_ggtt_suspend(to_gt(dev_priv)->ggtt)               // dev_priv → gt → ggtt\n  ├─ opregion_target_state = suspend_to_idle(dev_priv) ...  // dev_priv\n  ├─ dev_priv->suspend_count++\n  └─ i915_gem_drain_freed_objects(dev_priv)\n```\n\nInside `intel_display_driver_suspend(display)` only `display` is used:\n- `HAS_DISPLAY(display)` → early `return 0`\n- `drm_atomic_helper_suspend(display->drm)` — `display->drm` is the same `drm_device` originally passed to `i915_drm_suspend`\n- `display->restore.modeset_state = state` (saved for resume)\n- `flush_workqueue(display->wq.cleanup)`\n- `intel_dp_mst_suspend(display)`\n\n**Summary of the dataflow:** `struct device *kdev` → drvdata → `drm_i915_private *dev_priv` → `dev_priv->display` (`struct intel_display *`) → `display->drm` (back to the original `drm_device`). So `dev_priv` itself stops at `i915_drm_suspend`; the display layer receives only the decoupled `intel_display` handle.",
+      "usage": {
+        "input": 2,
+        "output": 1935,
+        "cacheRead": 23363,
+        "cacheWrite": 17096,
+        "reasoning": 102,
+        "totalTokens": 42396,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.048375,
+          "cacheRead": 0.0116815,
+          "cacheWrite": 0.10685,
+          "total": 0.1669165
+        }
+      }
     }
   ],
   "aggregate": {

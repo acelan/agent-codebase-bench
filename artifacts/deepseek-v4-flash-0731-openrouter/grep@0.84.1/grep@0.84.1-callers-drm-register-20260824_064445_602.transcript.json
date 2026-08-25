@@ -38,7 +38,22 @@
             "limit": 5
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 1449,
+        "output": 173,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 62,
+        "totalTokens": 1622,
+        "cost": {
+          "input": 0.00013041,
+          "output": 3.114e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.00016155
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -78,7 +93,22 @@
             "path": "/workspace/linux/drivers/gpu/drm/i915"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 921,
+        "output": 110,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 41,
+        "totalTokens": 2567,
+        "cost": {
+          "input": 8.289e-05,
+          "output": 1.98e-05,
+          "cacheRead": 2.7647999999999997e-05,
+          "cacheWrite": 0,
+          "total": 0.000130338
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -116,7 +146,22 @@
             "pattern": "pm_runtime_get_sync"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 1399,
+        "output": 152,
+        "cacheRead": 2304,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 3855,
+        "cost": {
+          "input": 0.00012591,
+          "output": 2.736e-05,
+          "cacheRead": 4.1472e-05,
+          "cacheWrite": 0,
+          "total": 0.000194742
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -194,7 +239,22 @@
             "limit": 40
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 516,
+        "output": 667,
+        "cacheRead": 3584,
+        "cacheWrite": 0,
+        "reasoning": 216,
+        "totalTokens": 4767,
+        "cost": {
+          "input": 4.644e-05,
+          "output": 0.00012006,
+          "cacheRead": 6.4512e-05,
+          "cacheWrite": 0,
+          "total": 0.000231012
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -277,7 +337,22 @@
             "limit": 40
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3696,
+        "output": 490,
+        "cacheRead": 4096,
+        "cacheWrite": 0,
+        "reasoning": 254,
+        "totalTokens": 8282,
+        "cost": {
+          "input": 0.00033264,
+          "output": 8.82e-05,
+          "cacheRead": 7.3728e-05,
+          "cacheWrite": 0,
+          "total": 0.000494568
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -358,7 +433,22 @@
             "pattern": "mock_gem_device"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 8774,
+        "output": 991,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 475,
+        "totalTokens": 9765,
+        "cost": {
+          "input": 0.00078966,
+          "output": 0.00017838,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.00096804
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -480,7 +570,22 @@
             "limit": 150
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 1865,
+        "output": 767,
+        "cacheRead": 9216,
+        "cacheWrite": 0,
+        "reasoning": 313,
+        "totalTokens": 11848,
+        "cost": {
+          "input": 0.00016785,
+          "output": 0.00013806,
+          "cacheRead": 0.000165888,
+          "cacheWrite": 0,
+          "total": 0.00047179799999999994
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -563,7 +668,22 @@
             "limit": 35
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2653,
+        "output": 1264,
+        "cacheRead": 11776,
+        "cacheWrite": 0,
+        "reasoning": 920,
+        "totalTokens": 15693,
+        "cost": {
+          "input": 0.00023877,
+          "output": 0.00022752,
+          "cacheRead": 0.000211968,
+          "cacheWrite": 0,
+          "total": 0.0006782579999999999
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -594,7 +714,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "Line 895 is inside `i915_driver_probe` (starts at 831). So `i915_driver_probe` calls `i915_driver_register`.\n\nNow I have the full picture. Let me verify drm_dev_register and pm_runtime_get_sync definitions - they are defined outside i915 (kernel core), but that's not required. The question asks about callers within i915.\n\nLet me compile the report. Let me double check there aren't other drm_dev_register or pm_runtime_get_sync in subdirectories (display, gt, gem, pxp). My grep covered the whole i915 tree already (path /workspace/linux/drivers/gpu/drm/i915 glob covers subdirs). Let me verify the grep was recursive - yes, grep searches the directory recursively.\n\nBoth greps returned results including subdirs (gt/, selftests/). So complete.\n\nNow let me build the call graph (only within i915, one hop up from direct callers):\n\n**Direct callers of drm_dev_register:**\n1. `i915_driver_register` (i915_driver.c) — static\n   - Called by: `i915_driver_probe` (i915_driver.c:895, non-static, main PCI probe entry)\n\n**Direct callers of pm_runtime_get_sync:**\n2. `__intel_runtime_pm_get` (intel_runtime_pm.c:172, static)\n   - Called by: `intel_runtime_pm_get_raw` (:276), `intel_runtime_pm_get` (:293) — both public\n3. `intel_runtime_pm_enable` (intel_runtime_pm.c:475, public)\n   - Called by: `i915_driver_register` (i915_driver.c:661)\n4. `intel_runtime_pm_disable` (intel_runtime_pm.c:506, public)\n   - Called by: `i915_driver_unregister` (i915_driver.c:681), `i915_driver_shutdown` (i915_driver.c:1029)\n5. `rpm_get` (intel_rc6.c:531, static)\n   - Called by: `intel_rc6_init` (:601), `intel_rc6_sanitize` (:626), `intel_rc6_disable` (:717)\n6. `mock_gem_device` (mock_gem_device.c:198, test-only)\n   - Called by: many selftest entry functions (i915_gem_evict, i915_gem_gtt, i915_vma, i915_request, intel_memory_region, i915_gem_phys, i915_gem_dmabuf, i915_gem_object, huge_pages, selftest_timeline)\n\nNow, \"report any call cycle.\"\n\nLook for cycles. A cycle would be if a direct caller is reachable from another direct caller up the chain, or if the call chain forms a loop.\n\nConsider:\n- i915_driver_register calls drm_dev_register, intel_runtime_pm_enable, intel_runtime_pm_disable? No. i915_driver_register calls intel_runtime_pm_enable (line 661). Does i915_driver_register call intel_runtime_pm_disable? No, that's in i915_driver_unregister.\n\n- Is there any path where pm_runtime_get_sync → ... → drm_dev_register or vice versa? No, pm_runtime_get_sync and drm_dev_register are external leaf functions.\n\n- A cycle within i915 would require one of the direct callers to be (transitively) called from within its own caller subtree. E.g., does i915_driver_probe get called from within the register chain? i915_driver_probe is the top-level PCI probe. Not called within.\n\nLet me check: does anything below call i915_driver_probe or i915_driver_register? i915_driver_register is called only by i915_driver_probe. So no cycle there.\n\nAre there cycles like rpm_get called by intel_rc6_disable, which is called by intel_rc6_fini, which might be called by something that calls rpm_get? No, that's just depth, not a cycle.\n\nIs there a cycle in the sense that a \"direct caller\" appears in the \"one-hop-up\" list of another direct caller, creating a mutual reference? Let's check:\n- intel_runtime_pm_enable's caller is i915_driver_register.\n- i915_driver_register is itself a direct caller (of drm_dev_register).\nSo i915_driver_register → (calls) intel_runtime_pm_enable → (calls) pm_runtime_get_sync. And i915_driver_register also → drm_dev_register.\nThis is a fan-out from i915_driver_register to two targets, not a cycle.\n\nNo cycle. But wait, let me double check whether intel_runtime_pm_get → pm_runtime... no cycle.\n\nActually, let me carefully scan for a cycle. The definition: a \"call cycle\" is when following call edges returns to a node already visited. \n\nLet's examine all reachable edges:\ni915_driver_probe → i915_driver_register\ni915_driver_register → drm_dev_register, intel_runtime_pm_enable, (and others)\nintel_runtime_pm_enable → pm_runtime_get_sync\ni915_driver_probe calls i915_driver_register once, no recursion back to probe.\n\nGoes through i915_driver_register → intel_runtime_pm_enable → ... does intel_runtime_pm_enable call anything that could lead back to i915_driver_register or probe? It calls pm_runtime_* functions only. No.\n\nintel_rc6_init → rpm_get → pm_runtime_get_sync. No cycle.\n\nSo no call cycles. \n\nBut wait — one subtle thing: does anything call i915_driver_shutdown which is a caller of intel_runtime_pm_disable, and does the shutdown chain get triggered... not relevant.\n\nReport: No call cycles found.\n\nLet me double-check the enclosing function of mock_gem_device callers and that mock_gem_device is indeed a selftest module. The pm_runtime_get_sync at line 198 is in mock_gem_device(). Its callers are the various selftest driver-test functions. Since the task likely focuses on production i915 code, I'll list the selftest callers too but note context. Let me get the names of the calling test functions. The grep shows the test files where mock_gem_device is called; the enclosing functions are e.g., in i915_gem_evict.c:550 etc. Those are test_... functions. I'll present them briefly.\n\nActually, let me verify whether the enclosing function names for the rpm_get call sites in intel_rc6.c (601,626,717) and confirm the 664 disable part. From reading:\n- intel_rc6_init at ~593, rpm_get at 601 (inside init). Grep said rpm_get at 601, 626, 717. \n- intel_rc6_sanitize: rpm_get at 626 (inside sanitize).\n- intel_rc6_disable: rpm_get at 717 (inside disable). \n\nGood.\n\nAlso I should double check that there are no other drm_dev_register calls beyond i915_driver.c:635. The grep returned one match only. Good.\n\nLet me also verify there are no additional pm_runtime_get_sync calls I missed (the grep returned 6 locations; those are within the direct caller functions). Good.\n\nNow compile final report. No tool calls needed further. Let me present.\n\nActually, one thing: the user says \"Report any call cycle.\" I've determined none. But let me also verify the caller of i915_driver_probe to make sure it's a leaf (PCI probe). Not needed for cycle.\n\nLet me write the report.\n## Call graph report\n\n**Scope:** `/workspace/linux/drivers/gpu/drm/i915` (recursive, includes `display/`, `gt/`, `gem/`, `selftests/`, `pxp/`).\n\n### 1. Direct callers\n\n**`drm_dev_register`** — 1 direct caller:\n| Caller | File:Line |\n|---|---|\n| `i915_driver_register` | `i915_driver.c:635` |\n\n**`pm_runtime_get_sync`** — 5 direct callers (6 call sites):\n| Caller | File:Line |\n|---|---|\n| `__intel_runtime_pm_get` (static closure) | `intel_runtime_pm.c:172` |\n| `intel_runtime_pm_enable` | `intel_runtime_pm.c:475` |\n| `intel_runtime_pm_disable` | `intel_runtime_pm.c:506` |\n| `rpm_get` (intel_rc6.c static helper) | `gt/intel_rc6.c:531` |\n| `mock_gem_device` (selftest-only) | `selftests/mock_gem_device.c:198` |\n\n### 2. One hop up (callers of each direct caller)\n\n**`i915_driver_register`** (calls `drm_dev_register`):\n- `i915_driver_probe` — `i915_driver.c:895` (main PCI probe entry)\n\n**`__intel_runtime_pm_get`** (calls `pm_runtime_get_sync`):\n- `intel_runtime_pm_get` — `intel_runtime_pm.c:293`\n- `intel_runtime_pm_get_raw` — `intel_runtime_pm.c:276`\n\n**`intel_runtime_pm_enable`** (calls `pm_runtime_get_sync`):\n- `i915_driver_register` — `i915_driver.c:661`\n\n**`intel_runtime_pm_disable`** (calls `pm_runtime_get_sync`):\n- `i915_driver_unregister` — `i915_driver.c:681`\n- `i915_driver_shutdown` — `i915_driver.c:1029`\n\n**`rpm_get`** (calls `pm_runtime_get_sync`):\n- `intel_rc6_init` — `gt/intel_rc6.c:601`\n- `intel_rc6_sanitize` — `gt/intel_rc6.c:626`\n- `intel_rc6_disable` — `gt/intel_rc6.c:717`\n\n**`mock_gem_device`** (calls `pm_runtime_get_sync`; selftest harness):\n- `i915_gem_evict.c:550`, `i915_gem_gtt.c:1935`, `i915_vma.c:934`, `i915_request.c:556`, `intel_memory_region.c:1355`, `gem/selftests/i915_gem_phys.c:79`, `i915_gem_dmabuf.c:540`, `i915_gem_object.c:82`, `gem/selftests/huge_pages.c:1967`, `gt/selftest_timeline.c:157` — all from selftest entrypoint functions.\n\n### 3. Call cycles\n\n**None found.** The graph is acyclic. Key structural observation: `i915_driver_register` is the only fan-out hub — it calls `drm_dev_register` (line 635) *and* `intel_runtime_pm_enable` (line 661); the latter then calls `pm_runtime_get_sync`. Both edges terminate at external kernel leaves, and nothing in the register/probe chain calls back into `i915_driver_probe`/`i915_driver_register`. Similarly, `rpm_get`, `intel_runtime_pm_get/raw`, enable, and disable all lead only to external `pm_runtime_*` leaf functions with no edge returning toward any caller. No mutually-recursive or self-referential path exists among the identified direct callers or their one-hop parents."
+      "content": "Line 895 is inside `i915_driver_probe` (starts at 831). So `i915_driver_probe` calls `i915_driver_register`.\n\nNow I have the full picture. Let me verify drm_dev_register and pm_runtime_get_sync definitions - they are defined outside i915 (kernel core), but that's not required. The question asks about callers within i915.\n\nLet me compile the report. Let me double check there aren't other drm_dev_register or pm_runtime_get_sync in subdirectories (display, gt, gem, pxp). My grep covered the whole i915 tree already (path /workspace/linux/drivers/gpu/drm/i915 glob covers subdirs). Let me verify the grep was recursive - yes, grep searches the directory recursively.\n\nBoth greps returned results including subdirs (gt/, selftests/). So complete.\n\nNow let me build the call graph (only within i915, one hop up from direct callers):\n\n**Direct callers of drm_dev_register:**\n1. `i915_driver_register` (i915_driver.c) — static\n   - Called by: `i915_driver_probe` (i915_driver.c:895, non-static, main PCI probe entry)\n\n**Direct callers of pm_runtime_get_sync:**\n2. `__intel_runtime_pm_get` (intel_runtime_pm.c:172, static)\n   - Called by: `intel_runtime_pm_get_raw` (:276), `intel_runtime_pm_get` (:293) — both public\n3. `intel_runtime_pm_enable` (intel_runtime_pm.c:475, public)\n   - Called by: `i915_driver_register` (i915_driver.c:661)\n4. `intel_runtime_pm_disable` (intel_runtime_pm.c:506, public)\n   - Called by: `i915_driver_unregister` (i915_driver.c:681), `i915_driver_shutdown` (i915_driver.c:1029)\n5. `rpm_get` (intel_rc6.c:531, static)\n   - Called by: `intel_rc6_init` (:601), `intel_rc6_sanitize` (:626), `intel_rc6_disable` (:717)\n6. `mock_gem_device` (mock_gem_device.c:198, test-only)\n   - Called by: many selftest entry functions (i915_gem_evict, i915_gem_gtt, i915_vma, i915_request, intel_memory_region, i915_gem_phys, i915_gem_dmabuf, i915_gem_object, huge_pages, selftest_timeline)\n\nNow, \"report any call cycle.\"\n\nLook for cycles. A cycle would be if a direct caller is reachable from another direct caller up the chain, or if the call chain forms a loop.\n\nConsider:\n- i915_driver_register calls drm_dev_register, intel_runtime_pm_enable, intel_runtime_pm_disable? No. i915_driver_register calls intel_runtime_pm_enable (line 661). Does i915_driver_register call intel_runtime_pm_disable? No, that's in i915_driver_unregister.\n\n- Is there any path where pm_runtime_get_sync → ... → drm_dev_register or vice versa? No, pm_runtime_get_sync and drm_dev_register are external leaf functions.\n\n- A cycle within i915 would require one of the direct callers to be (transitively) called from within its own caller subtree. E.g., does i915_driver_probe get called from within the register chain? i915_driver_probe is the top-level PCI probe. Not called within.\n\nLet me check: does anything below call i915_driver_probe or i915_driver_register? i915_driver_register is called only by i915_driver_probe. So no cycle there.\n\nAre there cycles like rpm_get called by intel_rc6_disable, which is called by intel_rc6_fini, which might be called by something that calls rpm_get? No, that's just depth, not a cycle.\n\nIs there a cycle in the sense that a \"direct caller\" appears in the \"one-hop-up\" list of another direct caller, creating a mutual reference? Let's check:\n- intel_runtime_pm_enable's caller is i915_driver_register.\n- i915_driver_register is itself a direct caller (of drm_dev_register).\nSo i915_driver_register → (calls) intel_runtime_pm_enable → (calls) pm_runtime_get_sync. And i915_driver_register also → drm_dev_register.\nThis is a fan-out from i915_driver_register to two targets, not a cycle.\n\nNo cycle. But wait, let me double check whether intel_runtime_pm_get → pm_runtime... no cycle.\n\nActually, let me carefully scan for a cycle. The definition: a \"call cycle\" is when following call edges returns to a node already visited. \n\nLet's examine all reachable edges:\ni915_driver_probe → i915_driver_register\ni915_driver_register → drm_dev_register, intel_runtime_pm_enable, (and others)\nintel_runtime_pm_enable → pm_runtime_get_sync\ni915_driver_probe calls i915_driver_register once, no recursion back to probe.\n\nGoes through i915_driver_register → intel_runtime_pm_enable → ... does intel_runtime_pm_enable call anything that could lead back to i915_driver_register or probe? It calls pm_runtime_* functions only. No.\n\nintel_rc6_init → rpm_get → pm_runtime_get_sync. No cycle.\n\nSo no call cycles. \n\nBut wait — one subtle thing: does anything call i915_driver_shutdown which is a caller of intel_runtime_pm_disable, and does the shutdown chain get triggered... not relevant.\n\nReport: No call cycles found.\n\nLet me double-check the enclosing function of mock_gem_device callers and that mock_gem_device is indeed a selftest module. The pm_runtime_get_sync at line 198 is in mock_gem_device(). Its callers are the various selftest driver-test functions. Since the task likely focuses on production i915 code, I'll list the selftest callers too but note context. Let me get the names of the calling test functions. The grep shows the test files where mock_gem_device is called; the enclosing functions are e.g., in i915_gem_evict.c:550 etc. Those are test_... functions. I'll present them briefly.\n\nActually, let me verify whether the enclosing function names for the rpm_get call sites in intel_rc6.c (601,626,717) and confirm the 664 disable part. From reading:\n- intel_rc6_init at ~593, rpm_get at 601 (inside init). Grep said rpm_get at 601, 626, 717. \n- intel_rc6_sanitize: rpm_get at 626 (inside sanitize).\n- intel_rc6_disable: rpm_get at 717 (inside disable). \n\nGood.\n\nAlso I should double check that there are no other drm_dev_register calls beyond i915_driver.c:635. The grep returned one match only. Good.\n\nLet me also verify there are no additional pm_runtime_get_sync calls I missed (the grep returned 6 locations; those are within the direct caller functions). Good.\n\nNow compile final report. No tool calls needed further. Let me present.\n\nActually, one thing: the user says \"Report any call cycle.\" I've determined none. But let me also verify the caller of i915_driver_probe to make sure it's a leaf (PCI probe). Not needed for cycle.\n\nLet me write the report.\n## Call graph report\n\n**Scope:** `/workspace/linux/drivers/gpu/drm/i915` (recursive, includes `display/`, `gt/`, `gem/`, `selftests/`, `pxp/`).\n\n### 1. Direct callers\n\n**`drm_dev_register`** — 1 direct caller:\n| Caller | File:Line |\n|---|---|\n| `i915_driver_register` | `i915_driver.c:635` |\n\n**`pm_runtime_get_sync`** — 5 direct callers (6 call sites):\n| Caller | File:Line |\n|---|---|\n| `__intel_runtime_pm_get` (static closure) | `intel_runtime_pm.c:172` |\n| `intel_runtime_pm_enable` | `intel_runtime_pm.c:475` |\n| `intel_runtime_pm_disable` | `intel_runtime_pm.c:506` |\n| `rpm_get` (intel_rc6.c static helper) | `gt/intel_rc6.c:531` |\n| `mock_gem_device` (selftest-only) | `selftests/mock_gem_device.c:198` |\n\n### 2. One hop up (callers of each direct caller)\n\n**`i915_driver_register`** (calls `drm_dev_register`):\n- `i915_driver_probe` — `i915_driver.c:895` (main PCI probe entry)\n\n**`__intel_runtime_pm_get`** (calls `pm_runtime_get_sync`):\n- `intel_runtime_pm_get` — `intel_runtime_pm.c:293`\n- `intel_runtime_pm_get_raw` — `intel_runtime_pm.c:276`\n\n**`intel_runtime_pm_enable`** (calls `pm_runtime_get_sync`):\n- `i915_driver_register` — `i915_driver.c:661`\n\n**`intel_runtime_pm_disable`** (calls `pm_runtime_get_sync`):\n- `i915_driver_unregister` — `i915_driver.c:681`\n- `i915_driver_shutdown` — `i915_driver.c:1029`\n\n**`rpm_get`** (calls `pm_runtime_get_sync`):\n- `intel_rc6_init` — `gt/intel_rc6.c:601`\n- `intel_rc6_sanitize` — `gt/intel_rc6.c:626`\n- `intel_rc6_disable` — `gt/intel_rc6.c:717`\n\n**`mock_gem_device`** (calls `pm_runtime_get_sync`; selftest harness):\n- `i915_gem_evict.c:550`, `i915_gem_gtt.c:1935`, `i915_vma.c:934`, `i915_request.c:556`, `intel_memory_region.c:1355`, `gem/selftests/i915_gem_phys.c:79`, `i915_gem_dmabuf.c:540`, `i915_gem_object.c:82`, `gem/selftests/huge_pages.c:1967`, `gt/selftest_timeline.c:157` — all from selftest entrypoint functions.\n\n### 3. Call cycles\n\n**None found.** The graph is acyclic. Key structural observation: `i915_driver_register` is the only fan-out hub — it calls `drm_dev_register` (line 635) *and* `intel_runtime_pm_enable` (line 661); the latter then calls `pm_runtime_get_sync`. Both edges terminate at external kernel leaves, and nothing in the register/probe chain calls back into `i915_driver_probe`/`i915_driver_register`. Similarly, `rpm_get`, `intel_runtime_pm_get/raw`, enable, and disable all lead only to external `pm_runtime_*` leaf functions with no edge returning toward any caller. No mutually-recursive or self-referential path exists among the identified direct callers or their one-hop parents.",
+      "usage": {
+        "input": 866,
+        "output": 2691,
+        "cacheRead": 15360,
+        "cacheWrite": 0,
+        "reasoning": 1582,
+        "totalTokens": 18917,
+        "cost": {
+          "input": 7.794e-05,
+          "output": 0.00048437999999999997,
+          "cacheRead": 0.00027648,
+          "cacheWrite": 0,
+          "total": 0.0008388
+        }
+      }
     }
   ],
   "aggregate": {

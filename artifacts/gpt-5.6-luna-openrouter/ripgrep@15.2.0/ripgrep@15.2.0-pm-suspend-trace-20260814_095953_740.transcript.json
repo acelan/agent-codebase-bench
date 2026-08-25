@@ -30,7 +30,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 94,
+        "cacheRead": 1231,
+        "cacheWrite": 74,
+        "reasoning": 22,
+        "totalTokens": 1402,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 5.6399999999999995e-05,
+          "cacheRead": 1.231e-05,
+          "cacheWrite": 9.25e-06,
+          "total": 7.825999999999999e-05
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -68,7 +83,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 100,
+        "cacheRead": 1305,
+        "cacheWrite": 121,
+        "reasoning": 16,
+        "totalTokens": 1529,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 5.9999999999999995e-05,
+          "cacheRead": 1.305e-05,
+          "cacheWrite": 1.5125e-05,
+          "total": 8.8475e-05
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -109,7 +139,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 87,
+        "cacheRead": 1426,
+        "cacheWrite": 1371,
+        "reasoning": 12,
+        "totalTokens": 2887,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 5.2199999999999995e-05,
+          "cacheRead": 1.426e-05,
+          "cacheWrite": 0.000171375,
+          "total": 0.000238135
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -166,7 +211,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 253,
+        "cacheRead": 2797,
+        "cacheWrite": 5218,
+        "reasoning": 76,
+        "totalTokens": 8271,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001518,
+          "cacheRead": 2.797e-05,
+          "cacheWrite": 0.00065225,
+          "total": 0.0008323200000000001
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -246,7 +306,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 357,
+        "cacheRead": 8015,
+        "cacheWrite": 9042,
+        "reasoning": 174,
+        "totalTokens": 17417,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0002142,
+          "cacheRead": 8.015e-05,
+          "cacheWrite": 0.00113025,
+          "total": 0.0014249
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -299,7 +374,22 @@
             "limit": 45
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 240,
+        "cacheRead": 17057,
+        "cacheWrite": 7760,
+        "reasoning": 197,
+        "totalTokens": 25060,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.000144,
+          "cacheRead": 0.00017057000000000002,
+          "cacheWrite": 0.00097,
+          "total": 0.00128487
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -319,7 +409,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "Repository root: `/workspace/linux`\n\n## PCI PM callback wiring\n\n`drivers/gpu/drm/i915/i915_pci.c:1031` attaches `i915_pm_ops` to the PCI driver:\n\n```c\n.driver.pm = &i915_pm_ops,\n```\n\nThe PM table is in `drivers/gpu/drm/i915/i915_driver.c:1713`.\n\n### Callbacks that reach `i915_pm_suspend`\n\nThere are two callback entries:\n\n#### System suspend\n\n```text\nPCI PM core\n  -> i915_pm_ops.suspend\n  -> i915_pm_suspend(kdev)\n       -> kdev_to_i915(kdev)\n       -> i915_drm_suspend(&i915->drm)\n            -> dev_priv = to_i915(dev)\n            -> display = dev_priv->display\n            -> intel_display_driver_suspend(display)\n```\n\nLocations:\n\n- `i915_driver.c:1719` — `.suspend = i915_pm_suspend`\n- `i915_driver.c:1392` — `i915_pm_suspend()`\n- `i915_driver.c:1404` — call to `i915_drm_suspend()`\n- `i915_driver.c:1103` — `i915_drm_suspend()`\n- `i915_driver.c:1120` — `intel_display_driver_suspend(display)`\n\n#### Hibernation poweroff\n\n```text\nPCI PM core\n  -> i915_pm_ops.poweroff\n  -> i915_pm_suspend(kdev)\n       -> kdev_to_i915(kdev)\n       -> i915_drm_suspend(&i915->drm)\n            -> dev_priv = to_i915(dev)\n            -> display = dev_priv->display\n            -> intel_display_driver_suspend(display)\n```\n\nLocations:\n\n- `i915_driver.c:1745` — `.poweroff = i915_pm_suspend`\n- The remaining chain is identical to the system-suspend path.\n\nThus, `.suspend` and `.poweroff` are two separate PCI PM callback entries, but both invoke the same `i915_pm_suspend()` implementation.\n\n## Other PCI PM callbacks\n\nThe complete `i915_pm_ops` callback set is:\n\n```text\n.prepare          -> i915_pm_prepare\n.suspend          -> i915_pm_suspend\n.suspend_late     -> i915_pm_suspend_late\n.suspend_noirq    -> i915_pm_suspend_noirq\n.resume_early     -> i915_pm_resume_early\n.resume            -> i915_pm_resume\n.complete          -> i915_pm_complete\n\n.freeze           -> i915_pm_freeze\n.freeze_late      -> i915_pm_freeze_late\n.thaw_early       -> i915_pm_thaw_early\n.thaw              -> i915_pm_thaw\n.poweroff         -> i915_pm_suspend\n.poweroff_late    -> i915_pm_poweroff_late\n.poweroff_noirq   -> i915_pm_poweroff_noirq\n.restore_early    -> i915_pm_restore_early\n.restore           -> i915_pm_restore\n\n.runtime_suspend  -> intel_runtime_suspend\n.runtime_resume   -> intel_runtime_resume\n```\n\nOnly `.suspend` and `.poweroff` reach `i915_pm_suspend()` directly.\n\nThe switcheroo path is separate:\n\n```text\ni915_switcheroo.c\n  -> i915_driver_suspend_switcheroo(i915, state)\n       -> i915_drm_suspend(&i915->drm)\n       -> i915_drm_suspend_late(&i915->drm, false)\n       -> pci_save_state()\n       -> pci_set_power_state(..., PCI_D3hot)\n```\n\nIt reaches `i915_drm_suspend()`, but does **not** call `i915_pm_suspend()`.\n\n## Callers that also call runtime suspend\n\nThere is no function named `i915_pm_runtime_suspend` in this tree. The runtime-suspend callback is named `intel_runtime_suspend`:\n\n```c\n.runtime_suspend = intel_runtime_suspend,\n```\n\nat `i915_driver.c:1752`.\n\nNone of the callers that reach `i915_pm_suspend()` also call `intel_runtime_suspend()`:\n\n```text\ni915_pm_suspend()\n  -> i915_drm_suspend()\n       -> intel_display_driver_suspend()\n```\n\nis separate from:\n\n```text\nintel_runtime_suspend()\n  -> i915_gem_runtime_suspend(dev_priv)\n  -> intel_pxp_runtime_suspend(dev_priv->pxp)\n  -> intel_gt_runtime_suspend(gt)\n  -> intel_irq_suspend(dev_priv)\n  -> intel_uncore_suspend(gt->uncore)\n  -> intel_display_power_suspend(display)\n  -> vlv_suspend_complete(dev_priv)\n  -> intel_runtime_pm_driver_release(rpm)\n```\n\nThe runtime callback is at `i915_driver.c:1545`; its implementation does not call `i915_pm_suspend()` or `i915_drm_suspend()`.\n\nTherefore:\n\n| Callback/caller reaching `i915_pm_suspend()` | Also calls runtime suspend? |\n|---|---|\n| `i915_pm_ops.suspend` | No |\n| `i915_pm_ops.poweroff` | No |\n| `i915_driver_suspend_switcheroo()` | Does not call `i915_pm_suspend()`; also no |\n\n## `dev_priv` data flow from `i915_drm_suspend()` to display suspend\n\nThe relevant data flow is:\n\n```text\ni915_pm_suspend(struct device *kdev)\n  |\n  | struct drm_i915_private *i915 = kdev_to_i915(kdev);\n  |\n  | i915_drm_suspend(&i915->drm)\n  v\n\ni915_drm_suspend(struct drm_device *dev)\n  |\n  | struct drm_i915_private *dev_priv = to_i915(dev);\n  | struct intel_display *display = dev_priv->display;\n  |\n  | intel_display_driver_suspend(display)\n  v\n\nintel_display_driver_suspend(struct intel_display *display)\n```\n\nIn detail:\n\n1. `i915_pm_suspend()` receives the generic PM device pointer `kdev`.\n2. `kdev_to_i915(kdev)` recovers the driver-private object as `i915`.\n3. It passes the embedded DRM device:\n   ```c\n   i915_drm_suspend(&i915->drm);\n   ```\n4. `i915_drm_suspend()` converts the DRM device back to the private object:\n   ```c\n   struct drm_i915_private *dev_priv = to_i915(dev);\n   ```\n5. It extracts the display subsystem:\n   ```c\n   struct intel_display *display = dev_priv->display;\n   ```\n6. It passes `display`, rather than `dev_priv`, to:\n   ```c\n   intel_display_driver_suspend(display);\n   ```\n\nAt `intel_display_driver_suspend()` (`display/intel_display_driver.c:684`), the display object supplies the DRM device to the atomic suspend helper:\n\n```c\nstate = drm_atomic_helper_suspend(display->drm);\n```\n\nSo the object relationship is:\n\n```text\nkdev\n  -> drm_i915_private (i915/dev_priv)\n       -> drm_device (&dev_priv->drm)\n       -> intel_display (dev_priv->display)\n            -> drm_device (display->drm)\n```"
+      "content": "Repository root: `/workspace/linux`\n\n## PCI PM callback wiring\n\n`drivers/gpu/drm/i915/i915_pci.c:1031` attaches `i915_pm_ops` to the PCI driver:\n\n```c\n.driver.pm = &i915_pm_ops,\n```\n\nThe PM table is in `drivers/gpu/drm/i915/i915_driver.c:1713`.\n\n### Callbacks that reach `i915_pm_suspend`\n\nThere are two callback entries:\n\n#### System suspend\n\n```text\nPCI PM core\n  -> i915_pm_ops.suspend\n  -> i915_pm_suspend(kdev)\n       -> kdev_to_i915(kdev)\n       -> i915_drm_suspend(&i915->drm)\n            -> dev_priv = to_i915(dev)\n            -> display = dev_priv->display\n            -> intel_display_driver_suspend(display)\n```\n\nLocations:\n\n- `i915_driver.c:1719` — `.suspend = i915_pm_suspend`\n- `i915_driver.c:1392` — `i915_pm_suspend()`\n- `i915_driver.c:1404` — call to `i915_drm_suspend()`\n- `i915_driver.c:1103` — `i915_drm_suspend()`\n- `i915_driver.c:1120` — `intel_display_driver_suspend(display)`\n\n#### Hibernation poweroff\n\n```text\nPCI PM core\n  -> i915_pm_ops.poweroff\n  -> i915_pm_suspend(kdev)\n       -> kdev_to_i915(kdev)\n       -> i915_drm_suspend(&i915->drm)\n            -> dev_priv = to_i915(dev)\n            -> display = dev_priv->display\n            -> intel_display_driver_suspend(display)\n```\n\nLocations:\n\n- `i915_driver.c:1745` — `.poweroff = i915_pm_suspend`\n- The remaining chain is identical to the system-suspend path.\n\nThus, `.suspend` and `.poweroff` are two separate PCI PM callback entries, but both invoke the same `i915_pm_suspend()` implementation.\n\n## Other PCI PM callbacks\n\nThe complete `i915_pm_ops` callback set is:\n\n```text\n.prepare          -> i915_pm_prepare\n.suspend          -> i915_pm_suspend\n.suspend_late     -> i915_pm_suspend_late\n.suspend_noirq    -> i915_pm_suspend_noirq\n.resume_early     -> i915_pm_resume_early\n.resume            -> i915_pm_resume\n.complete          -> i915_pm_complete\n\n.freeze           -> i915_pm_freeze\n.freeze_late      -> i915_pm_freeze_late\n.thaw_early       -> i915_pm_thaw_early\n.thaw              -> i915_pm_thaw\n.poweroff         -> i915_pm_suspend\n.poweroff_late    -> i915_pm_poweroff_late\n.poweroff_noirq   -> i915_pm_poweroff_noirq\n.restore_early    -> i915_pm_restore_early\n.restore           -> i915_pm_restore\n\n.runtime_suspend  -> intel_runtime_suspend\n.runtime_resume   -> intel_runtime_resume\n```\n\nOnly `.suspend` and `.poweroff` reach `i915_pm_suspend()` directly.\n\nThe switcheroo path is separate:\n\n```text\ni915_switcheroo.c\n  -> i915_driver_suspend_switcheroo(i915, state)\n       -> i915_drm_suspend(&i915->drm)\n       -> i915_drm_suspend_late(&i915->drm, false)\n       -> pci_save_state()\n       -> pci_set_power_state(..., PCI_D3hot)\n```\n\nIt reaches `i915_drm_suspend()`, but does **not** call `i915_pm_suspend()`.\n\n## Callers that also call runtime suspend\n\nThere is no function named `i915_pm_runtime_suspend` in this tree. The runtime-suspend callback is named `intel_runtime_suspend`:\n\n```c\n.runtime_suspend = intel_runtime_suspend,\n```\n\nat `i915_driver.c:1752`.\n\nNone of the callers that reach `i915_pm_suspend()` also call `intel_runtime_suspend()`:\n\n```text\ni915_pm_suspend()\n  -> i915_drm_suspend()\n       -> intel_display_driver_suspend()\n```\n\nis separate from:\n\n```text\nintel_runtime_suspend()\n  -> i915_gem_runtime_suspend(dev_priv)\n  -> intel_pxp_runtime_suspend(dev_priv->pxp)\n  -> intel_gt_runtime_suspend(gt)\n  -> intel_irq_suspend(dev_priv)\n  -> intel_uncore_suspend(gt->uncore)\n  -> intel_display_power_suspend(display)\n  -> vlv_suspend_complete(dev_priv)\n  -> intel_runtime_pm_driver_release(rpm)\n```\n\nThe runtime callback is at `i915_driver.c:1545`; its implementation does not call `i915_pm_suspend()` or `i915_drm_suspend()`.\n\nTherefore:\n\n| Callback/caller reaching `i915_pm_suspend()` | Also calls runtime suspend? |\n|---|---|\n| `i915_pm_ops.suspend` | No |\n| `i915_pm_ops.poweroff` | No |\n| `i915_driver_suspend_switcheroo()` | Does not call `i915_pm_suspend()`; also no |\n\n## `dev_priv` data flow from `i915_drm_suspend()` to display suspend\n\nThe relevant data flow is:\n\n```text\ni915_pm_suspend(struct device *kdev)\n  |\n  | struct drm_i915_private *i915 = kdev_to_i915(kdev);\n  |\n  | i915_drm_suspend(&i915->drm)\n  v\n\ni915_drm_suspend(struct drm_device *dev)\n  |\n  | struct drm_i915_private *dev_priv = to_i915(dev);\n  | struct intel_display *display = dev_priv->display;\n  |\n  | intel_display_driver_suspend(display)\n  v\n\nintel_display_driver_suspend(struct intel_display *display)\n```\n\nIn detail:\n\n1. `i915_pm_suspend()` receives the generic PM device pointer `kdev`.\n2. `kdev_to_i915(kdev)` recovers the driver-private object as `i915`.\n3. It passes the embedded DRM device:\n   ```c\n   i915_drm_suspend(&i915->drm);\n   ```\n4. `i915_drm_suspend()` converts the DRM device back to the private object:\n   ```c\n   struct drm_i915_private *dev_priv = to_i915(dev);\n   ```\n5. It extracts the display subsystem:\n   ```c\n   struct intel_display *display = dev_priv->display;\n   ```\n6. It passes `display`, rather than `dev_priv`, to:\n   ```c\n   intel_display_driver_suspend(display);\n   ```\n\nAt `intel_display_driver_suspend()` (`display/intel_display_driver.c:684`), the display object supplies the DRM device to the atomic suspend helper:\n\n```c\nstate = drm_atomic_helper_suspend(display->drm);\n```\n\nSo the object relationship is:\n\n```text\nkdev\n  -> drm_i915_private (i915/dev_priv)\n       -> drm_device (&dev_priv->drm)\n       -> intel_display (dev_priv->display)\n            -> drm_device (display->drm)\n```",
+      "usage": {
+        "input": 3,
+        "output": 1740,
+        "cacheRead": 24817,
+        "cacheWrite": 318,
+        "reasoning": 254,
+        "totalTokens": 26878,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.001044,
+          "cacheRead": 0.00024817000000000003,
+          "cacheWrite": 3.975e-05,
+          "total": 0.00133222
+        }
+      }
     }
   ],
   "aggregate": {

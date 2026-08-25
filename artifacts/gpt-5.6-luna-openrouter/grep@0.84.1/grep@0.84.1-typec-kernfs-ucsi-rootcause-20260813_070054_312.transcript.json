@@ -47,7 +47,22 @@
             "limit": 200
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 132,
+        "cacheRead": 0,
+        "cacheWrite": 1134,
+        "reasoning": 19,
+        "totalTokens": 1269,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 7.92e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0.00014175,
+          "total": 0.00022124999999999998
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -145,7 +160,22 @@
             "limit": 125
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 326,
+        "cacheRead": 1134,
+        "cacheWrite": 22778,
+        "reasoning": 77,
+        "totalTokens": 24241,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00019559999999999998,
+          "cacheRead": 1.134e-05,
+          "cacheWrite": 0.00284725,
+          "total": 0.00305449
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -277,7 +307,22 @@
             "limit": 50
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 272,
+        "cacheRead": 23912,
+        "cacheWrite": 18502,
+        "reasoning": 30,
+        "totalTokens": 42689,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00016319999999999998,
+          "cacheRead": 0.00023912,
+          "cacheWrite": 0.00231275,
+          "total": 0.00271537
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -387,7 +432,22 @@
             "limit": 200
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 231,
+        "cacheRead": 42414,
+        "cacheWrite": 22491,
+        "reasoning": 34,
+        "totalTokens": 65139,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00013859999999999998,
+          "cacheRead": 0.00042414,
+          "cacheWrite": 0.002811375,
+          "total": 0.003374415
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -440,7 +500,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 97,
+        "cacheRead": 64905,
+        "cacheWrite": 38367,
+        "reasoning": 64,
+        "totalTokens": 103372,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 5.82e-05,
+          "cacheRead": 0.00064905,
+          "cacheWrite": 0.004795875,
+          "total": 0.005503424999999999
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -473,7 +548,22 @@
             "limit": 200
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 202,
+        "cacheRead": 103272,
+        "cacheWrite": 2876,
+        "reasoning": 149,
+        "totalTokens": 106353,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00012119999999999999,
+          "cacheRead": 0.00103272,
+          "cacheWrite": 0.0003595,
+          "total": 0.00151372
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -534,7 +624,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 216,
+        "cacheRead": 106148,
+        "cacheWrite": 17707,
+        "reasoning": 62,
+        "totalTokens": 124074,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001296,
+          "cacheRead": 0.00106148,
+          "cacheWrite": 0.002213375,
+          "total": 0.003404755
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -587,7 +692,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "**Explaining ENOENT issues**\n\nI need to clarify the ENOENT warnings mentioned by the user. There's a specific ENOENT warning regarding \"parent NULL,\" which indicates an issue with directory paths rather than missing child elements. Additionally, there’s another ENOENT occurrence that doesn’t have a warning. I want to make sure to explain both properly and also add a caveat about how kernel line shifts can affect outcomes. It feels crucial to provide thorough information on this!\n## Conclusion\n\nThe warning is caused by a **Type-C partner teardown race**. The UCSI worker unregisters a partner after the USB device’s sysfs directory, or its `typec` symlink, has already been removed.\n\nThe current tree contains `partner_link_lock`, but **that is not a complete fix for this warning**. In particular, `typec_partner_deattach()` can still call `typec_partner_unlink_device()` without first verifying that the device is still the port’s recorded USB device and still has a live sysfs directory.\n\nI found no commit metadata or patch in this checkout that identifies a completed upstream fix series. The tree’s remaining code still contains the offending unconditional unlink.\n\n---\n\n## Call chain\n\nThe reported UCSI path is:\n\n```text\nucsi_handle_connector_change()\n  -> ucsi_unregister_partner()\n     -> typec_unregister_partner()\n        -> typec_partner_unlink_device()\n           -> sysfs_remove_link(&dev->kobj, \"typec\")\n              -> kernfs_remove_by_name_ns()\n```\n\n### UCSI\n\n`drivers/usb/typec/ucsi/ucsi.c:1264`:\n\n```c\nstatic void ucsi_handle_connector_change(struct work_struct *work)\n```\n\nAt `drivers/usb/typec/ucsi/ucsi.c:1325`, a connector-change event reporting disconnection calls:\n\n```c\nucsi_unregister_partner(con);\n```\n\n`drivers/usb/typec/ucsi/ucsi.c:1138` defines:\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n```\n\nand at `ucsi.c:1151` it calls:\n\n```c\ntypec_unregister_partner(con->partner);\n```\n\n### Type-C class\n\n`drivers/usb/typec/class.c:1174`:\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n```\n\nThe relevant calls are:\n\n```c\nclass.c:1185:\n    typec_partner_unlink_device(partner, port->usb2_dev);\n\nclass.c:1189:\n    typec_partner_unlink_device(partner, port->usb3_dev);\n```\n\nThe helper is `drivers/usb/typec/class.c:906`:\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n                                        struct device *dev)\n{\n    sysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n    sysfs_remove_link(&dev->kobj, \"typec\");\n\n    if (partner->deattach)\n        partner->deattach(partner, dev);\n}\n```\n\nThe `\"typec\"` symlink was created by the corresponding helper at `class.c:888`, specifically:\n\n```c\nclass.c:892:\n    sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n```\n\nThus the warning is generated while removing the symlink from the USB device’s sysfs directory.\n\n---\n\n## Why `kernfs_remove_by_name_ns()` reports “no directory”\n\n`fs/sysfs/symlink.c:143-153` implements `sysfs_remove_link()`:\n\n```c\nvoid sysfs_remove_link(struct kobject *kobj, const char *name)\n{\n    struct kernfs_node *parent = NULL;\n\n    if (!kobj)\n        parent = sysfs_root_kn;\n    else\n        parent = kobj->sd;\n\n    kernfs_remove_by_name(parent, name);\n}\n```\n\n`kernfs_remove_by_name()` forwards to `kernfs_remove_by_name_ns()`.\n\nIn this tree, `fs/kernfs/dir.c:1724` contains:\n\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n                             const struct ns_common *ns)\n```\n\nand the warning path is:\n\n```c\nif (!parent) {\n    WARN(1, KERN_WARNING\n         \"kernfs: can not remove '%s', no directory\\n\", name);\n    return -ENOENT;\n}\n```\n\nTherefore the reported warning means:\n\n```text\nkernfs_remove_by_name_ns(NULL, \"typec\", ...)\n```\n\nThe `NULL` parent comes from:\n\n```text\ndev->kobj.sd == NULL\n```\n\n`fs/sysfs/dir.c:79-103`, `sysfs_remove_dir()`, explicitly clears the sysfs directory pointer:\n\n```c\nspin_lock(&sysfs_symlink_target_lock);\nkobj->sd = NULL;\nspin_unlock(&sysfs_symlink_target_lock);\n```\n\nConsequently, after USB device teardown has removed its sysfs directory, a later:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\npasses `NULL` as the kernfs parent and emits the warning.\n\nThere is also a second `-ENOENT` path in `kernfs_remove_by_name_ns()`: if the parent exists but the child named `\"typec\"` is already gone, `kernfs_find_ns()` returns `NULL` and the function returns `-ENOENT`. The quoted **“no directory” WARN specifically corresponds to `parent == NULL`**, not merely to an already absent child.\n\n---\n\n## Competing teardown path\n\nThe other remover is the USB attach/detach path.\n\nThe Type-C port installs:\n\n```c\ndrivers/usb/typec/class.c:2752:\n    port->con.attach = typec_partner_attach;\n\nclass.c:2753:\n    port->con.deattach = typec_partner_deattach;\n```\n\n`typec_partner_deattach()` begins at `class.c:2169` and calls:\n\n```c\nclass.c:2177:\n    typec_partner_unlink_device(partner, dev);\n```\n\nIt then clears the recorded USB device pointer at `class.c:2181-2184`.\n\nThe normal USB disconnect path calls `typec_deattach()` before `device_del()`, so the ordinary teardown ordering is safe. The problem is that the UCSI connector-change work runs asynchronously and can operate on the port’s stored `usb2_dev`/`usb3_dev` pointer after the USB device’s sysfs state has already changed.\n\nThe stored pointers are raw `struct device *` values. The `partner_link_lock` protects pointer updates, but it does not by itself make an already-unregistered device’s `kobj.sd` valid again.\n\n---\n\n## Is the fix present in this tree?\n\n### Partial protection present\n\nThis tree does contain `partner_link_lock`:\n\n- Declaration: `drivers/usb/typec/class.h:64`\n- Initialization: `drivers/usb/typec/class.c:2746`\n\nIt is used around partner registration and unregistration:\n\n- `class.c:1149-1162`\n- `class.c:1183-1194`\n\nand around USB attach/detach:\n\n- `class.c:2151-2166`\n- `class.c:2174-2185`\n\nHowever, the actual unlink helper remains unconditional:\n\n```c\nclass.c:908-909:\nsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThere is no check for:\n\n```c\ndevice_is_registered(dev)\ndev->kobj.state_in_sysfs\ndev->kobj.sd\n```\n\nnor does `typec_partner_deattach()` conditionally perform the unlink only when `dev` is still the matching `port->usb2_dev`/`port->usb3_dev`.\n\nSo the locking in this tree should be regarded as **partial serialization**, not a complete fix for the observed stale-sysfs teardown case.\n\n### Upstream commit/series\n\nThe checkout contains no patch files or commit-message references identifying an upstream fix for this exact warning. Grep finds the locking and unlink implementation, but no `Fixes:` tag, patch description, or named upstream series.\n\nThe required upstream-style fix is in the Type-C class path, not in `kernfs`: make USB-device/partner unlinking teardown-safe. That means, depending on the upstream version/series:\n\n1. serialize the partner unlink against USB detach;\n2. only unlink when the device is still the port’s matching USB device; and/or\n3. skip `sysfs_remove_link(&dev->kobj, \"typec\")` once the device’s sysfs directory is gone.\n\nThe currently checked-out `drivers/usb/typec/class.c` does not contain that complete protection. Thus the Dell’s `6.17.0-1011-oem` warning is consistent with a known Type-C/UCSI teardown-ordering bug, and this tree should not be reported as already containing the complete fix merely because it has `partner_link_lock`."
+      "content": "**Explaining ENOENT issues**\n\nI need to clarify the ENOENT warnings mentioned by the user. There's a specific ENOENT warning regarding \"parent NULL,\" which indicates an issue with directory paths rather than missing child elements. Additionally, there’s another ENOENT occurrence that doesn’t have a warning. I want to make sure to explain both properly and also add a caveat about how kernel line shifts can affect outcomes. It feels crucial to provide thorough information on this!\n## Conclusion\n\nThe warning is caused by a **Type-C partner teardown race**. The UCSI worker unregisters a partner after the USB device’s sysfs directory, or its `typec` symlink, has already been removed.\n\nThe current tree contains `partner_link_lock`, but **that is not a complete fix for this warning**. In particular, `typec_partner_deattach()` can still call `typec_partner_unlink_device()` without first verifying that the device is still the port’s recorded USB device and still has a live sysfs directory.\n\nI found no commit metadata or patch in this checkout that identifies a completed upstream fix series. The tree’s remaining code still contains the offending unconditional unlink.\n\n---\n\n## Call chain\n\nThe reported UCSI path is:\n\n```text\nucsi_handle_connector_change()\n  -> ucsi_unregister_partner()\n     -> typec_unregister_partner()\n        -> typec_partner_unlink_device()\n           -> sysfs_remove_link(&dev->kobj, \"typec\")\n              -> kernfs_remove_by_name_ns()\n```\n\n### UCSI\n\n`drivers/usb/typec/ucsi/ucsi.c:1264`:\n\n```c\nstatic void ucsi_handle_connector_change(struct work_struct *work)\n```\n\nAt `drivers/usb/typec/ucsi/ucsi.c:1325`, a connector-change event reporting disconnection calls:\n\n```c\nucsi_unregister_partner(con);\n```\n\n`drivers/usb/typec/ucsi/ucsi.c:1138` defines:\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n```\n\nand at `ucsi.c:1151` it calls:\n\n```c\ntypec_unregister_partner(con->partner);\n```\n\n### Type-C class\n\n`drivers/usb/typec/class.c:1174`:\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n```\n\nThe relevant calls are:\n\n```c\nclass.c:1185:\n    typec_partner_unlink_device(partner, port->usb2_dev);\n\nclass.c:1189:\n    typec_partner_unlink_device(partner, port->usb3_dev);\n```\n\nThe helper is `drivers/usb/typec/class.c:906`:\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n                                        struct device *dev)\n{\n    sysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n    sysfs_remove_link(&dev->kobj, \"typec\");\n\n    if (partner->deattach)\n        partner->deattach(partner, dev);\n}\n```\n\nThe `\"typec\"` symlink was created by the corresponding helper at `class.c:888`, specifically:\n\n```c\nclass.c:892:\n    sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n```\n\nThus the warning is generated while removing the symlink from the USB device’s sysfs directory.\n\n---\n\n## Why `kernfs_remove_by_name_ns()` reports “no directory”\n\n`fs/sysfs/symlink.c:143-153` implements `sysfs_remove_link()`:\n\n```c\nvoid sysfs_remove_link(struct kobject *kobj, const char *name)\n{\n    struct kernfs_node *parent = NULL;\n\n    if (!kobj)\n        parent = sysfs_root_kn;\n    else\n        parent = kobj->sd;\n\n    kernfs_remove_by_name(parent, name);\n}\n```\n\n`kernfs_remove_by_name()` forwards to `kernfs_remove_by_name_ns()`.\n\nIn this tree, `fs/kernfs/dir.c:1724` contains:\n\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n                             const struct ns_common *ns)\n```\n\nand the warning path is:\n\n```c\nif (!parent) {\n    WARN(1, KERN_WARNING\n         \"kernfs: can not remove '%s', no directory\\n\", name);\n    return -ENOENT;\n}\n```\n\nTherefore the reported warning means:\n\n```text\nkernfs_remove_by_name_ns(NULL, \"typec\", ...)\n```\n\nThe `NULL` parent comes from:\n\n```text\ndev->kobj.sd == NULL\n```\n\n`fs/sysfs/dir.c:79-103`, `sysfs_remove_dir()`, explicitly clears the sysfs directory pointer:\n\n```c\nspin_lock(&sysfs_symlink_target_lock);\nkobj->sd = NULL;\nspin_unlock(&sysfs_symlink_target_lock);\n```\n\nConsequently, after USB device teardown has removed its sysfs directory, a later:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\npasses `NULL` as the kernfs parent and emits the warning.\n\nThere is also a second `-ENOENT` path in `kernfs_remove_by_name_ns()`: if the parent exists but the child named `\"typec\"` is already gone, `kernfs_find_ns()` returns `NULL` and the function returns `-ENOENT`. The quoted **“no directory” WARN specifically corresponds to `parent == NULL`**, not merely to an already absent child.\n\n---\n\n## Competing teardown path\n\nThe other remover is the USB attach/detach path.\n\nThe Type-C port installs:\n\n```c\ndrivers/usb/typec/class.c:2752:\n    port->con.attach = typec_partner_attach;\n\nclass.c:2753:\n    port->con.deattach = typec_partner_deattach;\n```\n\n`typec_partner_deattach()` begins at `class.c:2169` and calls:\n\n```c\nclass.c:2177:\n    typec_partner_unlink_device(partner, dev);\n```\n\nIt then clears the recorded USB device pointer at `class.c:2181-2184`.\n\nThe normal USB disconnect path calls `typec_deattach()` before `device_del()`, so the ordinary teardown ordering is safe. The problem is that the UCSI connector-change work runs asynchronously and can operate on the port’s stored `usb2_dev`/`usb3_dev` pointer after the USB device’s sysfs state has already changed.\n\nThe stored pointers are raw `struct device *` values. The `partner_link_lock` protects pointer updates, but it does not by itself make an already-unregistered device’s `kobj.sd` valid again.\n\n---\n\n## Is the fix present in this tree?\n\n### Partial protection present\n\nThis tree does contain `partner_link_lock`:\n\n- Declaration: `drivers/usb/typec/class.h:64`\n- Initialization: `drivers/usb/typec/class.c:2746`\n\nIt is used around partner registration and unregistration:\n\n- `class.c:1149-1162`\n- `class.c:1183-1194`\n\nand around USB attach/detach:\n\n- `class.c:2151-2166`\n- `class.c:2174-2185`\n\nHowever, the actual unlink helper remains unconditional:\n\n```c\nclass.c:908-909:\nsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThere is no check for:\n\n```c\ndevice_is_registered(dev)\ndev->kobj.state_in_sysfs\ndev->kobj.sd\n```\n\nnor does `typec_partner_deattach()` conditionally perform the unlink only when `dev` is still the matching `port->usb2_dev`/`port->usb3_dev`.\n\nSo the locking in this tree should be regarded as **partial serialization**, not a complete fix for the observed stale-sysfs teardown case.\n\n### Upstream commit/series\n\nThe checkout contains no patch files or commit-message references identifying an upstream fix for this exact warning. Grep finds the locking and unlink implementation, but no `Fixes:` tag, patch description, or named upstream series.\n\nThe required upstream-style fix is in the Type-C class path, not in `kernfs`: make USB-device/partner unlinking teardown-safe. That means, depending on the upstream version/series:\n\n1. serialize the partner unlink against USB detach;\n2. only unlink when the device is still the port’s matching USB device; and/or\n3. skip `sysfs_remove_link(&dev->kobj, \"typec\")` once the device’s sysfs directory is gone.\n\nThe currently checked-out `drivers/usb/typec/class.c` does not contain that complete protection. Thus the Dell’s `6.17.0-1011-oem` warning is consistent with a known Type-C/UCSI teardown-ordering bug, and this tree should not be reported as already containing the complete fix merely because it has `partner_link_lock`.",
+      "usage": {
+        "input": 3,
+        "output": 2747,
+        "cacheRead": 123855,
+        "cacheWrite": 410,
+        "reasoning": 943,
+        "totalTokens": 127015,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0016481999999999998,
+          "cacheRead": 0.00123855,
+          "cacheWrite": 5.125e-05,
+          "total": 0.0029382999999999996
+        }
+      }
     }
   ],
   "aggregate": {

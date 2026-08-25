@@ -99,6 +99,10 @@ def parse_stream(path):
                 trace["prompt"] = txt
             trace["events"].append({"type": "prompt", **base, "content": txt})
         elif role == "assistant":
+            # Per-request usage (input/output/cacheRead/cacheWrite/reasoning/
+            # totalTokens/cost), so a per-iteration breakdown can be shown in
+            # the report without re-parsing the raw jsonl stream.
+            u = msg.get("usage") or None
             calls = tool_calls_from_content(content)
             if calls:
                 tcs = [{
@@ -109,11 +113,13 @@ def parse_stream(path):
                 trace["events"].append({
                     "type": "assistant_tool_call", **base,
                     "content": text_content(content), "tool_calls": tcs,
+                    "usage": u,
                 })
             else:
                 txt = text_content(content)
                 etype = "final_answer" if txt else "assistant"
-                trace["events"].append({**base, "type": etype, "content": txt})
+                trace["events"].append({**base, "type": etype, "content": txt,
+                                        "usage": u})
         elif role in ("toolResult", "tool"):
             trace["events"].append({
                 "type": "tool_result", **base,

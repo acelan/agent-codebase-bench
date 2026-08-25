@@ -36,7 +36,22 @@
             "query": "pm_runtime_get_sync callers in drivers/gpu/drm/i915"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 756,
+        "output": 93,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 849,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -83,7 +98,22 @@
             "query": "i915_gem_context_create i915_request_await_gpu pm_runtime_get_sync in intel_gpu_top i915_gem_object ttm"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 12745,
+        "output": 335,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 13080,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -130,7 +160,22 @@
             "query": "functions in i915 that call intel_runtime_pm_get"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 31088,
+        "output": 283,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 31371,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -170,7 +215,22 @@
             "query": "callers of __intel_runtime_pm_get intel_runtime_pm_get_if_active __intel_runtime_pm_get_if_active i915_gem_context_get_guc"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 42989,
+        "output": 1007,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 43996,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -190,7 +250,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "I now have everything needed. Let me synthesize the answer.\n\nKey clarification: `__intel_runtime_pm_get_if_active` calls `pm_runtime_get_if_active` / `pm_runtime_get_if_in_use`, NOT `pm_runtime_get_sync`. So the only function in i915 that directly calls `pm_runtime_get_sync` is `__intel_runtime_pm_get`.\n\nCallers of `__intel_runtime_pm_get`: only `intel_runtime_pm_get` (line 293). That's the one-hop up.\n\nCall cycle analysis: No cycles.\n\nLet me write the report.\n## Report: i915 direct callers of `drm_dev_register` / `pm_runtime_get_sync`\n\nBoth target symbols live in the DRM core / PM core, not in i915. Within `drivers/gpu/drm/i915` there is exactly **one** direct caller of each.\n\n### 1. `drm_dev_register` (drivers/gpu/drm/drm_drv.c:1056)\n\n| Role | Function | Location |\n|------|----------|----------|\n| **Direct caller** | `i915_driver_register` | drivers/gpu/drm/i915/i915_driver.c:635 |\n| Onehop up → | `i915_driver_probe` | drivers/gpu/drm/i915/i915_driver.c:895 (calls `i915_driver_register`) |\n\n- `i915_driver_register` is a `static` function in i915, so its only caller is `i915_driver_probe` (the PCI probe path).\n- Note: within `i915_driver_register` there is also a paired `drm_dev_unregister` on the error path (line 639); that is not part of the requested edge.\n\n### 2. `pm_runtime_get_sync` (include/linux/pm_runtime.h:511, `static inline`)\n\n| Role | Function | Location |\n|------|----------|----------|\n| **Direct caller** | `__intel_runtime_pm_get` | drivers/gpu/drm/i915/intel_runtime_pm.c:172 |\n| One hop up → | `intel_runtime_pm_get` | drivers/gpu/drm/i915/intel_runtime_pm.c:293 (calls `__intel_runtime_pm_get(rpm, true)`) |\n\nNotes on correctness of the direct-caller set:\n- `__intel_runtime_pm_get` is the **only** i915 function that invokes `pm_runtime_get_sync`. The sibling `__intel_runtime_pm_get_if_active` (line 318) calls `pm_runtime_get_if_active` / `pm_runtime_get_if_in_use` — **not** `pm_runtime_get_sync` — so it is excluded.\n- `intel_runtime_pm_get` is exported wrapper; it in turn has 62 callers across i915 (i915_gem_context.c, i915_gem_mman.c, i915_gem_ttm.c, selftests, etc.), but those are two hops up and not part of the requested one-hop-up list.\n\n### Call cycles\n\n**None.** Both call graphs are simple acyclic chains terminating at the core leaf:\n\n```\ndrm_dev_register\n  ← i915_driver_register\n     ← i915_driver_probe\n\npm_runtime_get_sync  (→ __pm_runtime_resume)\n  ← __intel_runtime_pm_get\n     ← intel_runtime_pm_get\n```\n\nNo function in these chains calls a member of its own ancestor set, so there is no call cycle involving `drm_dev_register`, `pm_runtime_get_sync`, `i915_driver_register`, `i915_driver_probe`, `__intel_runtime_pm_get`, or `intel_runtime_pm_get`."
+      "content": "I now have everything needed. Let me synthesize the answer.\n\nKey clarification: `__intel_runtime_pm_get_if_active` calls `pm_runtime_get_if_active` / `pm_runtime_get_if_in_use`, NOT `pm_runtime_get_sync`. So the only function in i915 that directly calls `pm_runtime_get_sync` is `__intel_runtime_pm_get`.\n\nCallers of `__intel_runtime_pm_get`: only `intel_runtime_pm_get` (line 293). That's the one-hop up.\n\nCall cycle analysis: No cycles.\n\nLet me write the report.\n## Report: i915 direct callers of `drm_dev_register` / `pm_runtime_get_sync`\n\nBoth target symbols live in the DRM core / PM core, not in i915. Within `drivers/gpu/drm/i915` there is exactly **one** direct caller of each.\n\n### 1. `drm_dev_register` (drivers/gpu/drm/drm_drv.c:1056)\n\n| Role | Function | Location |\n|------|----------|----------|\n| **Direct caller** | `i915_driver_register` | drivers/gpu/drm/i915/i915_driver.c:635 |\n| Onehop up → | `i915_driver_probe` | drivers/gpu/drm/i915/i915_driver.c:895 (calls `i915_driver_register`) |\n\n- `i915_driver_register` is a `static` function in i915, so its only caller is `i915_driver_probe` (the PCI probe path).\n- Note: within `i915_driver_register` there is also a paired `drm_dev_unregister` on the error path (line 639); that is not part of the requested edge.\n\n### 2. `pm_runtime_get_sync` (include/linux/pm_runtime.h:511, `static inline`)\n\n| Role | Function | Location |\n|------|----------|----------|\n| **Direct caller** | `__intel_runtime_pm_get` | drivers/gpu/drm/i915/intel_runtime_pm.c:172 |\n| One hop up → | `intel_runtime_pm_get` | drivers/gpu/drm/i915/intel_runtime_pm.c:293 (calls `__intel_runtime_pm_get(rpm, true)`) |\n\nNotes on correctness of the direct-caller set:\n- `__intel_runtime_pm_get` is the **only** i915 function that invokes `pm_runtime_get_sync`. The sibling `__intel_runtime_pm_get_if_active` (line 318) calls `pm_runtime_get_if_active` / `pm_runtime_get_if_in_use` — **not** `pm_runtime_get_sync` — so it is excluded.\n- `intel_runtime_pm_get` is exported wrapper; it in turn has 62 callers across i915 (i915_gem_context.c, i915_gem_mman.c, i915_gem_ttm.c, selftests, etc.), but those are two hops up and not part of the requested one-hop-up list.\n\n### Call cycles\n\n**None.** Both call graphs are simple acyclic chains terminating at the core leaf:\n\n```\ndrm_dev_register\n  ← i915_driver_register\n     ← i915_driver_probe\n\npm_runtime_get_sync  (→ __pm_runtime_resume)\n  ← __intel_runtime_pm_get\n     ← intel_runtime_pm_get\n```\n\nNo function in these chains calls a member of its own ancestor set, so there is no call cycle involving `drm_dev_register`, `pm_runtime_get_sync`, `i915_driver_register`, `i915_driver_probe`, `__intel_runtime_pm_get`, or `intel_runtime_pm_get`.",
+      "usage": {
+        "input": 49287,
+        "output": 825,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 50112,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     }
   ],
   "aggregate": {

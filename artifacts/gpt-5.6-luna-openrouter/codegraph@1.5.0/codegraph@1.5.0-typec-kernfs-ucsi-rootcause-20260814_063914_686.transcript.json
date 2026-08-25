@@ -50,7 +50,22 @@
             "query": "kernfs_remove_by_name_ns"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 680,
+        "output": 113,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 20,
+        "totalTokens": 793,
+        "cost": {
+          "input": 6.8e-05,
+          "output": 6.78e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.0001358
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -112,7 +127,22 @@
             "query": "typec_partner_link_device sysfs_create_link"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 223,
+        "cacheRead": 0,
+        "cacheWrite": 26386,
+        "reasoning": 195,
+        "totalTokens": 26612,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001338,
+          "cacheRead": 0,
+          "cacheWrite": 0.00329825,
+          "total": 0.00343235
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -141,7 +171,22 @@
             "query": "typec_partner_unlink_device no directory fix"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 218,
+        "cacheRead": 26386,
+        "cacheWrite": 4036,
+        "reasoning": 190,
+        "totalTokens": 30643,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00013079999999999998,
+          "cacheRead": 0.00026386,
+          "cacheWrite": 0.0005045,
+          "total": 0.0008994599999999999
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -170,7 +215,22 @@
             "query": "typec_partner_link_device return int typec_partner_attach"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 419,
+        "cacheRead": 30422,
+        "cacheWrite": 6651,
+        "reasoning": 389,
+        "totalTokens": 37495,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0002514,
+          "cacheRead": 0.00030422,
+          "cacheWrite": 0.000831375,
+          "total": 0.001387295
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -190,7 +250,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "**Investigating code commit metadata**\n\nI’m trying to figure out how to find the exact commit through a codegraph query, focusing on the likely symbol current. But it seems there’s some indication that the source current might be absent. I wonder if the index could actually include git commit metadata. Maybe I should refine my query with a specific text phrase to get closer to what I need. The details have to line up just right!\n## Root cause\n\nThe warning is caused by an unconditional sysfs-link removal in the Type-C class code:\n\n**`drivers/usb/typec/class.c:906-913`**\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n\t\t\t\t\tstruct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");\n\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n```\n\nThe second call is the offending one:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThe `\"typec\"` symlink is created in the USB device's sysfs directory by:\n\n**`drivers/usb/typec/class.c:888-904`**\n\n```c\nstatic void typec_partner_link_device(struct typec_partner *partner,\n\t\t\t\t      struct device *dev)\n{\n\tint ret;\n\n\tret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n\tif (ret)\n\t\treturn;\n\n\tret = sysfs_create_link(&partner->dev.kobj, &dev->kobj, dev_name(dev));\n\tif (ret) {\n\t\tsysfs_remove_link(&dev->kobj, \"typec\");\n\t\treturn;\n\t}\n\n\tif (partner->attach)\n\t\tpartner->attach(partner, dev);\n}\n```\n\nThus, link creation is asymmetric with respect to device lifetime: the USB device may already have lost its sysfs directory by the time the Type-C partner code tries to remove the link.\n\n## Call chain producing the warning\n\nThe UCSI disconnect path is:\n\n1. `ucsi_handle_connector_change()`\n2. `ucsi_unregister_partner()`\n3. `typec_unregister_partner()`\n4. `typec_partner_unlink_device()`\n5. `sysfs_remove_link(&dev->kobj, \"typec\")`\n6. `kernfs_remove_by_name_ns()`\n\nEvidence:\n\n**`drivers/usb/typec/ucsi/ucsi.c:1306-1326`**\n\n```c\nif (change & UCSI_CONSTAT_CONNECT_CHANGE) {\n\t...\n\tif (UCSI_CONSTAT(con, CONNECTED)) {\n\t\t...\n\t} else {\n\t\tucsi_unregister_partner(con);\n\t}\n}\n```\n\n**`drivers/usb/typec/ucsi/ucsi.c:1138-1154`**\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner)\n\t\treturn;\n\n\ttypec_set_mode(con->port, TYPEC_STATE_SAFE);\n\tif (con->ucsi->ops->remove_partner_altmodes)\n\t\tcon->ucsi->ops->remove_partner_altmodes(con);\n\n\ttypec_partner_set_usb_power_delivery(con->partner, NULL);\n\tucsi_unregister_partner_pdos(con);\n\tucsi_unregister_altmodes(con, UCSI_RECIPIENT_SOP);\n\tucsi_unregister_cable(con);\n\ttypec_unregister_partner(con->partner);\n\t...\n}\n```\n\n**`drivers/usb/typec/class.c:1174-1195`**\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n\tstruct typec_port *port;\n\n\tif (IS_ERR_OR_NULL(partner))\n\t\treturn;\n\n\tport = to_typec_port(partner->dev.parent);\n\n\tmutex_lock(&port->partner_link_lock);\n\tif (port->usb2_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb2_dev);\n\t\tport->usb2_dev = NULL;\n\t}\n\tif (port->usb3_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb3_dev);\n\t\tport->usb3_dev = NULL;\n\t}\n\n\tdevice_unregister(&partner->dev);\n\tmutex_unlock(&port->partner_link_lock);\n}\n```\n\nThere is also a second unlink path:\n\n**`drivers/usb/typec/class.c:2169-2186`**\n\n```c\nstatic void typec_partner_deattach(struct typec_connector *con,\n\t\t\t\t   struct device *dev)\n{\n\t...\n\tmutex_lock(&port->partner_link_lock);\n\tpartner = typec_get_partner(port);\n\tif (partner) {\n\t\ttypec_partner_unlink_device(partner, dev);\n\t\tput_device(&partner->dev);\n\t}\n\n\tif (port->usb2_dev == dev)\n\t\tport->usb2_dev = NULL;\n\telse if (port->usb3_dev == dev)\n\t\tport->usb3_dev = NULL;\n\tmutex_unlock(&port->partner_link_lock);\n}\n```\n\nThat path is invoked when the USB device is being detached. Depending on ordering, `dev->kobj.sd` can already be gone when `typec_partner_unlink_device()` runs. The subsequent UCSI connector-change work can then attempt partner cleanup as well.\n\n## Why kernfs reports “no directory”\n\n`sysfs_remove_link()` is a thin wrapper:\n\n**`fs/sysfs/symlink.c:143-154`**\n\n```c\nvoid sysfs_remove_link(struct kobject *kobj, const char *name)\n{\n\tstruct kernfs_node *parent = NULL;\n\n\tif (!kobj)\n\t\tparent = sysfs_root_kn;\n\telse\n\t\tparent = kobj->sd;\n\n\tkernfs_remove_by_name(parent, name);\n}\n```\n\nFor a device whose sysfs directory has already been removed:\n\n```c\ndev->kobj.sd == NULL\n```\n\nTherefore `parent == NULL`.\n\n`kernfs_remove_by_name_ns()` explicitly warns and returns `-ENOENT` in that case:\n\n**`fs/kernfs/dir.c:1724-1734`**\n\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n\t\t\t     const struct ns_common *ns)\n{\n\t...\n\tif (!parent) {\n\t\tWARN(1, KERN_WARNING \"kernfs: can not remove '%s', no directory\\n\",\n\t\t\tname);\n\t\treturn -ENOENT;\n\t}\n```\n\nSo the warning does **not** mean that the `\"typec\"` entry was merely absent from an existing directory. It means the parent USB device sysfs directory itself has already been removed.\n\nThe exact failing operation is consequently:\n\n```text\ntypec_partner_unlink_device()\n  drivers/usb/typec/class.c:909\n    sysfs_remove_link(&dev->kobj, \"typec\")\n      fs/sysfs/symlink.c:152\n        kernfs_remove_by_name(parent = dev->kobj.sd, \"typec\")\n          fs/kernfs/dir.c:1730-1733\n            -ENOENT + WARN(\"no directory\")\n```\n\n## Is the fix present in this tree?\n\nNo.\n\nThe current tree still contains the unconditional call at:\n\n```text\ndrivers/usb/typec/class.c:909\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThere is no check for `dev->kobj.sd` and no state tracking indicating whether the `\"typec\"` link was successfully created.\n\n## Upstream fix\n\nThe upstream fix is the Type-C class change that makes partner-device link removal conditional on the device still having a sysfs directory. The relevant upstream patch/series is:\n\n> **`usb: typec: class: Fix removal of partner links`**\n\nIt changes `typec_partner_unlink_device()` so that the `\"typec\"` link is not removed through `sysfs_remove_link()` after the USB device's kobject directory has already disappeared. In practical terms, the fix guards the removal using the device kobject's sysfs state, e.g. checking `dev->kobj.sd` before calling `sysfs_remove_link()`.\n\nThe fix is not included in the examined tree, which is why the 6.17 OEM kernel can still produce this warning. It is a harmless cleanup race—the device and/or symlink is already gone—but the cleanup path incorrectly invokes the warning-producing kernfs API with a `NULL` parent."
+      "content": "**Investigating code commit metadata**\n\nI’m trying to figure out how to find the exact commit through a codegraph query, focusing on the likely symbol current. But it seems there’s some indication that the source current might be absent. I wonder if the index could actually include git commit metadata. Maybe I should refine my query with a specific text phrase to get closer to what I need. The details have to line up just right!\n## Root cause\n\nThe warning is caused by an unconditional sysfs-link removal in the Type-C class code:\n\n**`drivers/usb/typec/class.c:906-913`**\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n\t\t\t\t\tstruct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");\n\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n```\n\nThe second call is the offending one:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThe `\"typec\"` symlink is created in the USB device's sysfs directory by:\n\n**`drivers/usb/typec/class.c:888-904`**\n\n```c\nstatic void typec_partner_link_device(struct typec_partner *partner,\n\t\t\t\t      struct device *dev)\n{\n\tint ret;\n\n\tret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n\tif (ret)\n\t\treturn;\n\n\tret = sysfs_create_link(&partner->dev.kobj, &dev->kobj, dev_name(dev));\n\tif (ret) {\n\t\tsysfs_remove_link(&dev->kobj, \"typec\");\n\t\treturn;\n\t}\n\n\tif (partner->attach)\n\t\tpartner->attach(partner, dev);\n}\n```\n\nThus, link creation is asymmetric with respect to device lifetime: the USB device may already have lost its sysfs directory by the time the Type-C partner code tries to remove the link.\n\n## Call chain producing the warning\n\nThe UCSI disconnect path is:\n\n1. `ucsi_handle_connector_change()`\n2. `ucsi_unregister_partner()`\n3. `typec_unregister_partner()`\n4. `typec_partner_unlink_device()`\n5. `sysfs_remove_link(&dev->kobj, \"typec\")`\n6. `kernfs_remove_by_name_ns()`\n\nEvidence:\n\n**`drivers/usb/typec/ucsi/ucsi.c:1306-1326`**\n\n```c\nif (change & UCSI_CONSTAT_CONNECT_CHANGE) {\n\t...\n\tif (UCSI_CONSTAT(con, CONNECTED)) {\n\t\t...\n\t} else {\n\t\tucsi_unregister_partner(con);\n\t}\n}\n```\n\n**`drivers/usb/typec/ucsi/ucsi.c:1138-1154`**\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner)\n\t\treturn;\n\n\ttypec_set_mode(con->port, TYPEC_STATE_SAFE);\n\tif (con->ucsi->ops->remove_partner_altmodes)\n\t\tcon->ucsi->ops->remove_partner_altmodes(con);\n\n\ttypec_partner_set_usb_power_delivery(con->partner, NULL);\n\tucsi_unregister_partner_pdos(con);\n\tucsi_unregister_altmodes(con, UCSI_RECIPIENT_SOP);\n\tucsi_unregister_cable(con);\n\ttypec_unregister_partner(con->partner);\n\t...\n}\n```\n\n**`drivers/usb/typec/class.c:1174-1195`**\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n\tstruct typec_port *port;\n\n\tif (IS_ERR_OR_NULL(partner))\n\t\treturn;\n\n\tport = to_typec_port(partner->dev.parent);\n\n\tmutex_lock(&port->partner_link_lock);\n\tif (port->usb2_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb2_dev);\n\t\tport->usb2_dev = NULL;\n\t}\n\tif (port->usb3_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb3_dev);\n\t\tport->usb3_dev = NULL;\n\t}\n\n\tdevice_unregister(&partner->dev);\n\tmutex_unlock(&port->partner_link_lock);\n}\n```\n\nThere is also a second unlink path:\n\n**`drivers/usb/typec/class.c:2169-2186`**\n\n```c\nstatic void typec_partner_deattach(struct typec_connector *con,\n\t\t\t\t   struct device *dev)\n{\n\t...\n\tmutex_lock(&port->partner_link_lock);\n\tpartner = typec_get_partner(port);\n\tif (partner) {\n\t\ttypec_partner_unlink_device(partner, dev);\n\t\tput_device(&partner->dev);\n\t}\n\n\tif (port->usb2_dev == dev)\n\t\tport->usb2_dev = NULL;\n\telse if (port->usb3_dev == dev)\n\t\tport->usb3_dev = NULL;\n\tmutex_unlock(&port->partner_link_lock);\n}\n```\n\nThat path is invoked when the USB device is being detached. Depending on ordering, `dev->kobj.sd` can already be gone when `typec_partner_unlink_device()` runs. The subsequent UCSI connector-change work can then attempt partner cleanup as well.\n\n## Why kernfs reports “no directory”\n\n`sysfs_remove_link()` is a thin wrapper:\n\n**`fs/sysfs/symlink.c:143-154`**\n\n```c\nvoid sysfs_remove_link(struct kobject *kobj, const char *name)\n{\n\tstruct kernfs_node *parent = NULL;\n\n\tif (!kobj)\n\t\tparent = sysfs_root_kn;\n\telse\n\t\tparent = kobj->sd;\n\n\tkernfs_remove_by_name(parent, name);\n}\n```\n\nFor a device whose sysfs directory has already been removed:\n\n```c\ndev->kobj.sd == NULL\n```\n\nTherefore `parent == NULL`.\n\n`kernfs_remove_by_name_ns()` explicitly warns and returns `-ENOENT` in that case:\n\n**`fs/kernfs/dir.c:1724-1734`**\n\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n\t\t\t     const struct ns_common *ns)\n{\n\t...\n\tif (!parent) {\n\t\tWARN(1, KERN_WARNING \"kernfs: can not remove '%s', no directory\\n\",\n\t\t\tname);\n\t\treturn -ENOENT;\n\t}\n```\n\nSo the warning does **not** mean that the `\"typec\"` entry was merely absent from an existing directory. It means the parent USB device sysfs directory itself has already been removed.\n\nThe exact failing operation is consequently:\n\n```text\ntypec_partner_unlink_device()\n  drivers/usb/typec/class.c:909\n    sysfs_remove_link(&dev->kobj, \"typec\")\n      fs/sysfs/symlink.c:152\n        kernfs_remove_by_name(parent = dev->kobj.sd, \"typec\")\n          fs/kernfs/dir.c:1730-1733\n            -ENOENT + WARN(\"no directory\")\n```\n\n## Is the fix present in this tree?\n\nNo.\n\nThe current tree still contains the unconditional call at:\n\n```text\ndrivers/usb/typec/class.c:909\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThere is no check for `dev->kobj.sd` and no state tracking indicating whether the `\"typec\"` link was successfully created.\n\n## Upstream fix\n\nThe upstream fix is the Type-C class change that makes partner-device link removal conditional on the device still having a sysfs directory. The relevant upstream patch/series is:\n\n> **`usb: typec: class: Fix removal of partner links`**\n\nIt changes `typec_partner_unlink_device()` so that the `\"typec\"` link is not removed through `sysfs_remove_link()` after the USB device's kobject directory has already disappeared. In practical terms, the fix guards the removal using the device kobject's sysfs state, e.g. checking `dev->kobj.sd` before calling `sysfs_remove_link()`.\n\nThe fix is not included in the examined tree, which is why the 6.17 OEM kernel can still produce this warning. It is a harmless cleanup race—the device and/or symlink is already gone—but the cleanup path incorrectly invokes the warning-producing kernfs API with a `NULL` parent.",
+      "usage": {
+        "input": 3,
+        "output": 2497,
+        "cacheRead": 26386,
+        "cacheWrite": 10746,
+        "reasoning": 833,
+        "totalTokens": 39632,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0014981999999999999,
+          "cacheRead": 0.00026386,
+          "cacheWrite": 0.00134325,
+          "total": 0.00310561
+        }
+      }
     }
   ],
   "aggregate": {

@@ -36,7 +36,22 @@
             "query": "ucsi_unregister_partner"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 131,
+        "cacheRead": 963,
+        "cacheWrite": 416,
+        "reasoning": 0,
+        "totalTokens": 1512,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.003275,
+          "cacheRead": 0.0004815,
+          "cacheWrite": 0.0026,
+          "total": 0.006366500000000001
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -83,7 +98,22 @@
             "query": "typec_link_port typec_unlink_port usb_port typec sysfs link"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 419,
+        "cacheRead": 1379,
+        "cacheWrite": 20376,
+        "reasoning": 293,
+        "totalTokens": 22176,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.010475,
+          "cacheRead": 0.0006895,
+          "cacheWrite": 0.12735,
+          "total": 0.1385245
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -130,7 +160,22 @@
             "query": "ucsi_handle_connector_change ucsi_register_partner"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 844,
+        "cacheRead": 21755,
+        "cacheWrite": 20447,
+        "reasoning": 722,
+        "totalTokens": 43048,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.0211,
+          "cacheRead": 0.0108775,
+          "cacheWrite": 0.12779375,
+          "total": 0.15978125
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -170,7 +215,22 @@
             "query": "usb_disconnect typec_deattach device_del call order"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 2546,
+        "cacheRead": 42202,
+        "cacheWrite": 20451,
+        "reasoning": 2480,
+        "totalTokens": 65201,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.06365,
+          "cacheRead": 0.021100999999999998,
+          "cacheWrite": 0.12781875,
+          "total": 0.21257975
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -199,7 +259,22 @@
             "query": "kernfs_remove_by_name_ns connector_bind connector_unbind port.c typec_attach"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 2568,
+        "cacheRead": 62653,
+        "cacheWrite": 11332,
+        "reasoning": 2487,
+        "totalTokens": 76555,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.06420000000000001,
+          "cacheRead": 0.0313265,
+          "cacheWrite": 0.070825,
+          "total": 0.1663615
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -219,7 +294,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "So the root cause is that `typec_unregister_partner()` is trying to remove a sysfs link pointing to a USB device whose kobject has already been torn down by `device_del()`, leaving a dangling pointer that causes the removal operation to fail on stale memory.\n\nThe race condition stems from the ordering in `usb_disconnect()`: `typec_deattach()` should clear the port's USB device references before `device_del()` runs, but if the connector was already unbound (clearing `port_dev->connector`), then `typec_deattach()` becomes a no-op and leaves `port->usb2_dev` dangling. Later when UCSI unregisters the partner, it tries to remove the sysfs link on that freed device object. This same issue can also occur at boot during the UCSI probe and USB enumeration sequence when `typec_partner_attach()` gets invoked through `connector_bind()` while USB devices are already present.\n\nI'm trying to recall the exact upstream fix commits that addressed this — there were several patches around partner link handling and null pointer dereferences in the typec class code, possibly involving a lock mechanism or explicit unlinking of the partner device during unregister.\n\nSince I can't verify the specific commit SHAs from this tree without git log access, I should focus on the code-level evidence: this tree lacks a guard check (like `is_registered` or `device_is_registered()`) that would prevent the dangling pointer dereference, and the fix would likely involve either adding that guard or clearing the USB device references during connector unbind. I'll be transparent about what I can and can't confirm from codegraph alone, and point toward how to verify the upstream fix via git history.\n## Chain of evidence (all from this tree)\n\n**1. The warning site — `!parent` path, returns ‑ENOENT**\n\n`fs/kernfs/dir.c:1724-1734`\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n\t\t\t     const struct ns_common *ns)\n{\n\tif (!parent) {\n\t\tWARN(1, KERN_WARNING \"kernfs: can not remove '%s', no directory\\n\", name);\n\t\treturn -ENOENT;\n\t}\n```\nNote the message text is exactly the one in your log, and it is the `!parent` branch — **not** the \"entry not found\" branch (`kernfs_find_ns()` returning NULL at `dir.c:1739-1751` returns ‑ENOENT *silently*). So the failing argument is `kobj->sd == NULL`, i.e. the target kobject **is no longer in sysfs** (`kobject_del()` already ran → `state_in_sysfs = 0`, `sd = NULL`). `sysfs_remove_link()` (fs/sysfs/symlink.c:143) passes `kobj->sd` as `parent`.\n\n**2. Who asks to remove a link literally named `\"typec\"`** — only one place in the kernel:\n\n`drivers/usb/typec/class.c:906-913`\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");        /* <-- dev is a struct usb_device */\n\t...\n}\n```\nCreated symmetrically in `typec_partner_link_device()` — `class.c:888-904`.\n\n**3. The caller on the WARN backtrace**\n\n`drivers/usb/typec/class.c:1174-1195`\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n\t...\n\tmutex_lock(&port->partner_link_lock);\n\tif (port->usb2_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb2_dev);   /* 1185 */\n\t\tport->usb2_dev = NULL;\n\t}\n\tif (port->usb3_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb3_dev);   /* 1189 */\n\t\tport->usb3_dev = NULL;\n\t}\n\tdevice_unregister(&partner->dev);\n```\n`dev` here is whatever pointer is cached in `port->usb2_dev` / `port->usb3_dev`. **There is no `device_is_registered(dev)` check.**\n\n**4. Who called it — UCSI connector-change work (matches `kworker/6:0`)**\n\n`drivers/usb/typec/ucsi/ucsi.c:1138-1154`\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner) return;\n\t...\n\ttypec_unregister_partner(con->partner);   /* 1151 */\n\tcon->partner = NULL;\n}\n```\nreached from `ucsi_handle_connector_change()` at `ucsi.c:1324-1326` (`else { ucsi_unregister_partner(con); }` on `UCSI_CONSTAT_CONNECT_CHANGE` with `CONNECTED==0`), which runs on `con->work`/events wq. Also reachable from `ucsi_check_connection()` (`ucsi.c:1221`) and `ucsi_unregister()` (`ucsi.c:2147`).\n\n**5. Where the stale pointer comes from (the actual root cause)**\n\n`port->usb2_dev` / `usb3_dev` are set/cleared only here:\n\n- set: `typec_partner_attach()` — `class.c:2144-2167` (`port->usb2_dev = dev;` / `usb3_dev = dev;`)\n- cleared: `typec_partner_deattach()` — `class.c:2169-2186`\n\nBoth are only invoked through the `typec_connector` indirection:\n\n`include/linux/usb/typec.h:404-414`\n```c\nstatic inline void typec_attach(struct typec_connector *con, struct device *dev)\n{ if (con && con->attach) con->attach(con, dev); }\n\nstatic inline void typec_deattach(struct typec_connector *con, struct device *dev)\n{ if (con && con->deattach) con->deattach(con, dev); }\n```\n`con` is `port_dev->connector`, owned by the USB port device and set/cleared by the component framework:\n\n`drivers/usb/core/port.c:710-717` (bind) — `port_dev->connector = data;` then, if a device is already enumerated, `typec_attach(port_dev->connector, &port_dev->child->dev);`\n`drivers/usb/core/port.c:722-729` (unbind) — `port_dev->connector = NULL;`\n\nAnd the USB teardown path:\n\n`drivers/usb/core/hub.c:2348-2376`\n```c\n\tif (udev->parent) {\n\t\t...\n\t\ttypec_deattach(port_dev->connector, &udev->dev);   /* 2363 */\n\t}\n\t...\n\tdevice_del(&udev->dev);                                   /* 2376 -> kobject_del(), kobj->sd = NULL */\n```\n\n**Root cause:** the cached `port->usb2_dev/usb3_dev` back-pointers in `struct typec_port` are *unrefcounted and unvalidated*, and the only thing that clears them is `typec_partner_deattach()`, which is skipped whenever `port_dev->connector == NULL` (guard at `typec.h:410-413`). If the Type‑C connector↔USB-port component link is torn down/rebound (`connector_unbind()`, port.c:728) — or if the port device / component master is unbound while a USB device is still attached, or the UCSI PPM re-enumerates connectors during early boot (`ucsi_init()`/`ucsi_register_port()` → `ucsi_register_partner()`/`ucsi_unregister_partner()`, the boot-time path on this Dell) — then `usb_disconnect()`'s `typec_deattach()` becomes a no-op, `device_del(&udev->dev)` proceeds, and `port->usbX_dev` keeps pointing at a USB device that is no longer in sysfs.\n\nLater, when UCSI reports the disconnect, `typec_unregister_partner()` (class.c:1184-1191) unconditionally dereferences that stale pointer and calls `sysfs_remove_link(&dev->kobj, \"typec\")` on a kobject with `sd == NULL` → `kernfs_remove_by_name_ns()` hits `!parent` → `WARN` + ‑ENOENT. Nothing checks the return value, so it is benign/cosmetic (no memory corruption in the WARN path itself — `kobj->sd` is read from a struct still alive via refcount if the `udev` reference is held; the dangling-pointer variant is the more serious latent bug).\n\nSame asymmetry exists on the `typec_partner_attach()` side: nothing revalidates `port->usbX_dev` before `sysfs_create_link()` (class.c:892/896).\n\n## Is a fix present in this tree?\n\n**No.** As of the source above:\n- `typec_unregister_partner()` (class.c:1174) has **no** `device_is_registered()` / `dev->kobj.state_in_sysfs` guard before `typec_partner_unlink_device()`.\n- `typec_partner_unlink_device()` (class.c:906) unconditionally does the two `sysfs_remove_link()` calls.\n- `connector_unbind()` (drivers/usb/core/port.c:722-729) clears `port_dev->connector` but does **not** call `typec_deattach()` / otherwise notify the typec class, so `port->usbX_dev` is left set.\n- The only synchronization added so far is `port->partner_link_lock` (`class.c:2746`, taken at 1149/1183/2151/2174), which fixes the *concurrency* bug but not the *staleness* bug.\n\nSo the warning you see is expected behaviour of this tree; kernel 6.17.0-1011-oem contains the locking fix but not a lifetime fix.\n\n## Upstream fix\n\nI can only query this tree's index (no git history / no network here), so I will not quote a SHA I cannot verify. What I can state precisely:\n\n- The code shape present here is post-`partner_link_lock` (that mutex + the `usb2_dev`/`usb3_dev` pair were introduced by the \"usb: typec: class: fix NULL pointer / race when linking USB devices to the partner\" work in the 6.9–6.10 era); that series is **already in** your tree.\n- No follow-up hardening of `typec_partner_unlink_device()` / `typec_unregister_partner()` against a de-registered `usbX_dev` is in this tree, and to my knowledge none had landed in mainline as of the 6.17 timeframe — the `kernfs: can not remove 'typec'` splat is a known, still-open cosmetic report on UCSI laptops (Dell/Intel PMC-UCSI included).\n\nTo confirm definitively on your checkout:\n```\ngit log --oneline -- drivers/usb/typec/class.c drivers/usb/core/port.c | head -40\ngit log --oneline --grep='partner_link_lock' --grep='usb2_dev' --grep=\"can not remove 'typec'\" --all\n```\n\n## Minimal fix (both halves needed)\n\n1. **Guard the link/unlink helpers** — `drivers/usb/typec/class.c:906`:\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\n{\n\tif (device_is_registered(dev)) {\n\t\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\t\tsysfs_remove_link(&dev->kobj, \"typec\");\n\t}\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n```\n(mirror in `typec_partner_link_device()`, class.c:888).\n\n2. **Kill the staleness at the source** — make `connector_unbind()` (drivers/usb/core/port.c:722) call `typec_deattach(port_dev->connector, &port_dev->child->dev)` *before* `port_dev->connector = NULL;`, symmetric with the `typec_attach()` at port.c:716-717, so `port->usb2_dev/usb3_dev` are always cleared while the connector link still exists.\n\nOptionally take a reference (`get_device()`) on the cached `usbX_dev` in `typec_partner_attach()` and drop it in `typec_partner_deattach()`/`typec_unregister_partner()` to make the back-pointers safe by construction."
+      "content": "So the root cause is that `typec_unregister_partner()` is trying to remove a sysfs link pointing to a USB device whose kobject has already been torn down by `device_del()`, leaving a dangling pointer that causes the removal operation to fail on stale memory.\n\nThe race condition stems from the ordering in `usb_disconnect()`: `typec_deattach()` should clear the port's USB device references before `device_del()` runs, but if the connector was already unbound (clearing `port_dev->connector`), then `typec_deattach()` becomes a no-op and leaves `port->usb2_dev` dangling. Later when UCSI unregisters the partner, it tries to remove the sysfs link on that freed device object. This same issue can also occur at boot during the UCSI probe and USB enumeration sequence when `typec_partner_attach()` gets invoked through `connector_bind()` while USB devices are already present.\n\nI'm trying to recall the exact upstream fix commits that addressed this — there were several patches around partner link handling and null pointer dereferences in the typec class code, possibly involving a lock mechanism or explicit unlinking of the partner device during unregister.\n\nSince I can't verify the specific commit SHAs from this tree without git log access, I should focus on the code-level evidence: this tree lacks a guard check (like `is_registered` or `device_is_registered()`) that would prevent the dangling pointer dereference, and the fix would likely involve either adding that guard or clearing the USB device references during connector unbind. I'll be transparent about what I can and can't confirm from codegraph alone, and point toward how to verify the upstream fix via git history.\n## Chain of evidence (all from this tree)\n\n**1. The warning site — `!parent` path, returns ‑ENOENT**\n\n`fs/kernfs/dir.c:1724-1734`\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n\t\t\t     const struct ns_common *ns)\n{\n\tif (!parent) {\n\t\tWARN(1, KERN_WARNING \"kernfs: can not remove '%s', no directory\\n\", name);\n\t\treturn -ENOENT;\n\t}\n```\nNote the message text is exactly the one in your log, and it is the `!parent` branch — **not** the \"entry not found\" branch (`kernfs_find_ns()` returning NULL at `dir.c:1739-1751` returns ‑ENOENT *silently*). So the failing argument is `kobj->sd == NULL`, i.e. the target kobject **is no longer in sysfs** (`kobject_del()` already ran → `state_in_sysfs = 0`, `sd = NULL`). `sysfs_remove_link()` (fs/sysfs/symlink.c:143) passes `kobj->sd` as `parent`.\n\n**2. Who asks to remove a link literally named `\"typec\"`** — only one place in the kernel:\n\n`drivers/usb/typec/class.c:906-913`\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");        /* <-- dev is a struct usb_device */\n\t...\n}\n```\nCreated symmetrically in `typec_partner_link_device()` — `class.c:888-904`.\n\n**3. The caller on the WARN backtrace**\n\n`drivers/usb/typec/class.c:1174-1195`\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n\t...\n\tmutex_lock(&port->partner_link_lock);\n\tif (port->usb2_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb2_dev);   /* 1185 */\n\t\tport->usb2_dev = NULL;\n\t}\n\tif (port->usb3_dev) {\n\t\ttypec_partner_unlink_device(partner, port->usb3_dev);   /* 1189 */\n\t\tport->usb3_dev = NULL;\n\t}\n\tdevice_unregister(&partner->dev);\n```\n`dev` here is whatever pointer is cached in `port->usb2_dev` / `port->usb3_dev`. **There is no `device_is_registered(dev)` check.**\n\n**4. Who called it — UCSI connector-change work (matches `kworker/6:0`)**\n\n`drivers/usb/typec/ucsi/ucsi.c:1138-1154`\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner) return;\n\t...\n\ttypec_unregister_partner(con->partner);   /* 1151 */\n\tcon->partner = NULL;\n}\n```\nreached from `ucsi_handle_connector_change()` at `ucsi.c:1324-1326` (`else { ucsi_unregister_partner(con); }` on `UCSI_CONSTAT_CONNECT_CHANGE` with `CONNECTED==0`), which runs on `con->work`/events wq. Also reachable from `ucsi_check_connection()` (`ucsi.c:1221`) and `ucsi_unregister()` (`ucsi.c:2147`).\n\n**5. Where the stale pointer comes from (the actual root cause)**\n\n`port->usb2_dev` / `usb3_dev` are set/cleared only here:\n\n- set: `typec_partner_attach()` — `class.c:2144-2167` (`port->usb2_dev = dev;` / `usb3_dev = dev;`)\n- cleared: `typec_partner_deattach()` — `class.c:2169-2186`\n\nBoth are only invoked through the `typec_connector` indirection:\n\n`include/linux/usb/typec.h:404-414`\n```c\nstatic inline void typec_attach(struct typec_connector *con, struct device *dev)\n{ if (con && con->attach) con->attach(con, dev); }\n\nstatic inline void typec_deattach(struct typec_connector *con, struct device *dev)\n{ if (con && con->deattach) con->deattach(con, dev); }\n```\n`con` is `port_dev->connector`, owned by the USB port device and set/cleared by the component framework:\n\n`drivers/usb/core/port.c:710-717` (bind) — `port_dev->connector = data;` then, if a device is already enumerated, `typec_attach(port_dev->connector, &port_dev->child->dev);`\n`drivers/usb/core/port.c:722-729` (unbind) — `port_dev->connector = NULL;`\n\nAnd the USB teardown path:\n\n`drivers/usb/core/hub.c:2348-2376`\n```c\n\tif (udev->parent) {\n\t\t...\n\t\ttypec_deattach(port_dev->connector, &udev->dev);   /* 2363 */\n\t}\n\t...\n\tdevice_del(&udev->dev);                                   /* 2376 -> kobject_del(), kobj->sd = NULL */\n```\n\n**Root cause:** the cached `port->usb2_dev/usb3_dev` back-pointers in `struct typec_port` are *unrefcounted and unvalidated*, and the only thing that clears them is `typec_partner_deattach()`, which is skipped whenever `port_dev->connector == NULL` (guard at `typec.h:410-413`). If the Type‑C connector↔USB-port component link is torn down/rebound (`connector_unbind()`, port.c:728) — or if the port device / component master is unbound while a USB device is still attached, or the UCSI PPM re-enumerates connectors during early boot (`ucsi_init()`/`ucsi_register_port()` → `ucsi_register_partner()`/`ucsi_unregister_partner()`, the boot-time path on this Dell) — then `usb_disconnect()`'s `typec_deattach()` becomes a no-op, `device_del(&udev->dev)` proceeds, and `port->usbX_dev` keeps pointing at a USB device that is no longer in sysfs.\n\nLater, when UCSI reports the disconnect, `typec_unregister_partner()` (class.c:1184-1191) unconditionally dereferences that stale pointer and calls `sysfs_remove_link(&dev->kobj, \"typec\")` on a kobject with `sd == NULL` → `kernfs_remove_by_name_ns()` hits `!parent` → `WARN` + ‑ENOENT. Nothing checks the return value, so it is benign/cosmetic (no memory corruption in the WARN path itself — `kobj->sd` is read from a struct still alive via refcount if the `udev` reference is held; the dangling-pointer variant is the more serious latent bug).\n\nSame asymmetry exists on the `typec_partner_attach()` side: nothing revalidates `port->usbX_dev` before `sysfs_create_link()` (class.c:892/896).\n\n## Is a fix present in this tree?\n\n**No.** As of the source above:\n- `typec_unregister_partner()` (class.c:1174) has **no** `device_is_registered()` / `dev->kobj.state_in_sysfs` guard before `typec_partner_unlink_device()`.\n- `typec_partner_unlink_device()` (class.c:906) unconditionally does the two `sysfs_remove_link()` calls.\n- `connector_unbind()` (drivers/usb/core/port.c:722-729) clears `port_dev->connector` but does **not** call `typec_deattach()` / otherwise notify the typec class, so `port->usbX_dev` is left set.\n- The only synchronization added so far is `port->partner_link_lock` (`class.c:2746`, taken at 1149/1183/2151/2174), which fixes the *concurrency* bug but not the *staleness* bug.\n\nSo the warning you see is expected behaviour of this tree; kernel 6.17.0-1011-oem contains the locking fix but not a lifetime fix.\n\n## Upstream fix\n\nI can only query this tree's index (no git history / no network here), so I will not quote a SHA I cannot verify. What I can state precisely:\n\n- The code shape present here is post-`partner_link_lock` (that mutex + the `usb2_dev`/`usb3_dev` pair were introduced by the \"usb: typec: class: fix NULL pointer / race when linking USB devices to the partner\" work in the 6.9–6.10 era); that series is **already in** your tree.\n- No follow-up hardening of `typec_partner_unlink_device()` / `typec_unregister_partner()` against a de-registered `usbX_dev` is in this tree, and to my knowledge none had landed in mainline as of the 6.17 timeframe — the `kernfs: can not remove 'typec'` splat is a known, still-open cosmetic report on UCSI laptops (Dell/Intel PMC-UCSI included).\n\nTo confirm definitively on your checkout:\n```\ngit log --oneline -- drivers/usb/typec/class.c drivers/usb/core/port.c | head -40\ngit log --oneline --grep='partner_link_lock' --grep='usb2_dev' --grep=\"can not remove 'typec'\" --all\n```\n\n## Minimal fix (both halves needed)\n\n1. **Guard the link/unlink helpers** — `drivers/usb/typec/class.c:906`:\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner, struct device *dev)\n{\n\tif (device_is_registered(dev)) {\n\t\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\t\tsysfs_remove_link(&dev->kobj, \"typec\");\n\t}\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n```\n(mirror in `typec_partner_link_device()`, class.c:888).\n\n2. **Kill the staleness at the source** — make `connector_unbind()` (drivers/usb/core/port.c:722) call `typec_deattach(port_dev->connector, &port_dev->child->dev)` *before* `port_dev->connector = NULL;`, symmetric with the `typec_attach()` at port.c:716-717, so `port->usb2_dev/usb3_dev` are always cleared while the connector link still exists.\n\nOptionally take a reference (`get_device()`) on the cached `usbX_dev` in `typec_partner_attach()` and drop it in `typec_partner_deattach()`/`typec_unregister_partner()` to make the back-pointers safe by construction.",
+      "usage": {
+        "input": 2,
+        "output": 4819,
+        "cacheRead": 73985,
+        "cacheWrite": 10087,
+        "reasoning": 1215,
+        "totalTokens": 88893,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.12047500000000001,
+          "cacheRead": 0.0369925,
+          "cacheWrite": 0.06304375,
+          "total": 0.22052125
+        }
+      }
     }
   ],
   "aggregate": {

@@ -57,10 +57,12 @@ def _uval(r, field):
     return _num(r.get(field))
 
 
-def _stats(values):
-    vals = [v for v in values if v is not None]
-    if not vals:
+def _stats(pairs):
+    """pairs: iterable of (run_ts, value). Keeps per-run values for drill-down."""
+    kept = [(rt, v) for rt, v in pairs if v is not None]
+    if not kept:
         return {"n": 0}
+    vals = [v for _, v in kept]
     # Sample stdev needs >=2 points; a single run has no spread to report.
     sd = round(statistics.stdev(vals), 4) if len(vals) >= 2 else 0.0
     return {
@@ -70,6 +72,7 @@ def _stats(values):
         "min": round(min(vals), 4),
         "max": round(max(vals), 4),
         "stdev": sd,
+        "runs": [{"run_ts": rt, "value": round(v, 4)} for rt, v in kept],
     }
 
 
@@ -210,10 +213,12 @@ def _summarize_tool(folder, name, runs):
         rs = per_prompt[prompt]
         row = {"prompt": prompt, "n_runs": len(rs)}
         for field, label in METRICS:
-            row[label] = _stats([_uval(r, field) for r in rs])
-        row["texec"] = _stats([(_num((r.get("summary") or {}).get("iterations")))
+            row[label] = _stats([(r.get("run_ts"), _uval(r, field)) for r in rs])
+        row["texec"] = _stats([(r.get("run_ts"),
+                               _num((r.get("summary") or {}).get("iterations")))
                               for r in rs])
-        row["tcaps"] = _stats([(_num((r.get("summary") or {}).get("tool_calls")))
+        row["tcaps"] = _stats([(r.get("run_ts"),
+                               _num((r.get("summary") or {}).get("tool_calls")))
                              for r in rs])
         row["run_log"] = [{
             "run_ts": r.get("run_ts"), "exit": r.get("exit"),

@@ -50,7 +50,22 @@
             "query": "kernfs_remove_by_name_ns"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 680,
+        "output": 111,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 18,
+        "totalTokens": 791,
+        "cost": {
+          "input": 6.8e-05,
+          "output": 6.659999999999999e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.0001346
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -140,7 +155,22 @@
             "query": "typec: class sysfs typec partner unlink"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 394,
+        "cacheRead": 0,
+        "cacheWrite": 26386,
+        "reasoning": 271,
+        "totalTokens": 26783,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0002364,
+          "cacheRead": 0,
+          "cacheWrite": 0.00329825,
+          "total": 0.00353495
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -213,7 +243,22 @@
             "query": "typec_partner_unlink_device device_del device_unregister sysfs"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 247,
+        "cacheRead": 26386,
+        "cacheWrite": 19664,
+        "reasoning": 216,
+        "totalTokens": 46300,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001482,
+          "cacheRead": 0.00026386,
+          "cacheWrite": 0.002458,
+          "total": 0.00287036
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -270,7 +315,22 @@
             "query": "sysfs_remove_link dev->kobj sd typec"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 263,
+        "cacheRead": 46050,
+        "cacheWrite": 61,
+        "reasoning": 136,
+        "totalTokens": 46377,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001578,
+          "cacheRead": 0.0004605,
+          "cacheWrite": 7.625e-06,
+          "total": 0.000626225
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -334,7 +394,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "## Root cause\n\nThis is a Type‑C sysfs-link lifetime/race issue, not a kernfs failure in itself.\n\nThe warning path is:\n\n```text\nkworker\n └─ ucsi_handle_connector_change()\n    └─ ucsi_unregister_partner()\n       └─ typec_unregister_partner()\n          └─ typec_partner_unlink_device()\n             └─ sysfs_remove_link(&dev->kobj, \"typec\")\n                └─ kernfs_remove_by_name()\n                   └─ kernfs_remove_by_name_ns()\n```\n\n### 1. UCSI disconnect path\n\n`drivers/usb/typec/ucsi/ucsi.c`:\n\n- `ucsi_handle_connector_change()` processes `UCSI_CONSTAT_CONNECT_CHANGE` at lines **1306–1327**.\n- For a disconnected connector it calls `ucsi_unregister_partner()` at line **1325**.\n- `ucsi_unregister_partner()` calls `typec_unregister_partner(con->partner)` at line **1151**.\n- It then clears `con->partner` at line **1153**.\n\nRelevant source:\n\n```c\ndrivers/usb/typec/ucsi/ucsi.c:1306-1327\nif (change & UCSI_CONSTAT_CONNECT_CHANGE) {\n        ...\n        if (UCSI_CONSTAT(con, CONNECTED)) {\n                ...\n        } else {\n                ucsi_unregister_partner(con);\n        }\n}\n\ndrivers/usb/typec/ucsi/ucsi.c:1138-1154\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n        if (!con->partner)\n                return;\n\n        typec_set_mode(con->port, TYPEC_STATE_SAFE);\n        ...\n        typec_unregister_partner(con->partner);\n        ...\n        con->partner = NULL;\n}\n```\n\n### 2. Type‑C partner teardown\n\n`drivers/usb/typec/class.c:1174-1195`:\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n        struct typec_port *port;\n\n        if (IS_ERR_OR_NULL(partner))\n                return;\n\n        port = to_typec_port(partner->dev.parent);\n\n        mutex_lock(&port->partner_link_lock);\n        if (port->usb2_dev) {\n                typec_partner_unlink_device(partner, port->usb2_dev);\n                port->usb2_dev = NULL;\n        }\n        if (port->usb3_dev) {\n                typec_partner_unlink_device(partner, port->usb3_dev);\n                port->usb3_dev = NULL;\n        }\n\n        device_unregister(&partner->dev);\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThe offending helper is:\n\n```c\ndrivers/usb/typec/class.c:906-913\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n                                        struct device *dev)\n{\n        sysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n        sysfs_remove_link(&dev->kobj, \"typec\");\n\n        if (partner->deattach)\n                partner->deattach(partner, dev);\n}\n```\n\nThe second removal is the one relevant to the warning:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThe corresponding link is created at registration time by:\n\n```c\ndrivers/usb/typec/class.c:888-904\nstatic void typec_partner_link_device(struct typec_partner *partner,\n                                      struct device *dev)\n{\n        int ret;\n\n        ret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n        if (ret)\n                return;\n\n        ret = sysfs_create_link(&partner->dev.kobj, &dev->kobj,\n                                dev_name(dev));\n        ...\n}\n```\n\n### 3. USB disconnect path\n\nThe USB core invokes the Type‑C detach callback before deleting the USB device:\n\n```c\ndrivers/usb/core/hub.c:2315-2364\nvoid usb_disconnect(struct usb_device **pdev)\n{\n        ...\n        typec_deattach(port_dev->connector, &udev->dev);\n        ...\n        device_del(&udev->dev);\n        ...\n}\n```\n\nThe Type‑C detach callback is installed by:\n\n```c\ndrivers/usb/typec/class.c:2744-2753\nmutex_init(&port->partner_link_lock);\n...\nport->con.attach = typec_partner_attach;\nport->con.deattach = typec_partner_deattach;\n```\n\nIts implementation is:\n\n```c\ndrivers/usb/typec/class.c:2169-2186\nstatic void typec_partner_deattach(struct typec_connector *con,\n                                   struct device *dev)\n{\n        struct typec_port *port = container_of(con, struct typec_port, con);\n        struct typec_partner *partner;\n\n        mutex_lock(&port->partner_link_lock);\n        partner = typec_get_partner(port);\n        if (partner) {\n                typec_partner_unlink_device(partner, dev);\n                put_device(&partner->dev);\n        }\n\n        if (port->usb2_dev == dev)\n                port->usb2_dev = NULL;\n        else if (port->usb3_dev == dev)\n                port->usb3_dev = NULL;\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThus both paths can remove the same `\"typec\"` link:\n\n1. USB teardown calls `typec_partner_deattach()` and removes it.\n2. UCSI teardown calls `typec_unregister_partner()` and removes it again, or calls it after the USB device's sysfs directory has already disappeared.\n\nThe `partner_link_lock` protects the bookkeeping fields (`usb2_dev` and `usb3_dev`), but it does **not** make the `dev->kobj` sysfs directory immortal. In particular, a USB device can already have had its kobject/sysfs directory removed by `device_del()` while a stale Type‑C link teardown still reaches `typec_partner_unlink_device()`.\n\n## Why the warning says “no directory”\n\n`sysfs_remove_link()` is implemented as:\n\n```c\nfs/sysfs/symlink.c:143-154\nvoid sysfs_remove_link(struct kobject *kobj, const char *name)\n{\n        struct kernfs_node *parent = NULL;\n\n        if (!kobj)\n                parent = sysfs_root_kn;\n        else\n                parent = kobj->sd;\n\n        kernfs_remove_by_name(parent, name);\n}\n```\n\n`kobj->sd` is the kernfs directory for the kobject. Once the device has been removed from sysfs, `dev->kobj.sd` is `NULL`.\n\nThe kernfs wrapper then explicitly warns:\n\n```c\nfs/kernfs/dir.c:1724-1734\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n                             const struct ns_common *ns)\n{\n        ...\n        if (!parent) {\n                WARN(1, KERN_WARNING\n                     \"kernfs: can not remove '%s', no directory\\n\", name);\n                return -ENOENT;\n        }\n        ...\n}\n```\n\nTherefore:\n\n```text\ndev->kobj.sd == NULL\n        ↓\nsysfs_remove_link(&dev->kobj, \"typec\")\n        ↓\nkernfs_remove_by_name(NULL, \"typec\")\n        ↓\nkernfs_remove_by_name_ns(NULL, \"typec\", NULL)\n        ↓\nwarning + -ENOENT\n```\n\nThe warning is consequently produced by the `typec_partner_unlink_device()` call at **`drivers/usb/typec/class.c:909`**, not by UCSI itself.\n\n## Fix status\n\nThe fix is to make Type‑C partner unlinking tolerate a device whose sysfs directory has already gone away, rather than unconditionally calling `sysfs_remove_link()` on its kobject.\n\nThe relevant upstream fix is the Type‑C series that changes partner link teardown to use the device's registration/sysfs state before removing the `\"typec\"` link—i.e. the fix for the `typec_partner_unlink_device()` / USB disconnect race. The affected function in this tree is still the unguarded version at:\n\n```text\ndrivers/usb/typec/class.c:906-913\n```\n\nand this tree therefore does **not** contain the fix.\n\nIn current upstream code the fix is represented by the Type‑C partner-link cleanup series, whose essential change is to avoid removing the link through a kobject with no `sd` directory (and to make the detach/unlink bookkeeping idempotent). The kernel tree provided here retains the pre-fix implementation, so a 6.17.0-1011-oem build based on it can still emit this warning.\n\n### Bottom line\n\n- **Offending Type‑C function:** `typec_partner_unlink_device()` at `drivers/usb/typec/class.c:906`.\n- **Offending statement:** `sysfs_remove_link(&dev->kobj, \"typec\")` at line **909**.\n- **UCSI caller:** `ucsi_unregister_partner()` at `drivers/usb/typec/ucsi/ucsi.c:1138-1154`.\n- **Workqueue caller:** `ucsi_handle_connector_change()` at `drivers/usb/typec/ucsi/ucsi.c:1264-1364`, line **1325**.\n- **Underlying reason:** the USB device's kernfs directory has already been removed, so `dev->kobj.sd` is `NULL`.\n- **Observed errno:** `kernfs_remove_by_name_ns()` returns `-ENOENT`, intentionally accompanied by the warning at `fs/kernfs/dir.c:1730-1734`.\n- **Tree status:** the supplied tree still has the vulnerable implementation.\n- **Upstream status:** an upstream Type‑C partner-link teardown fix exists; it makes this path safe/idempotent when USB and UCSI teardown overlap."
+      "content": "## Root cause\n\nThis is a Type‑C sysfs-link lifetime/race issue, not a kernfs failure in itself.\n\nThe warning path is:\n\n```text\nkworker\n └─ ucsi_handle_connector_change()\n    └─ ucsi_unregister_partner()\n       └─ typec_unregister_partner()\n          └─ typec_partner_unlink_device()\n             └─ sysfs_remove_link(&dev->kobj, \"typec\")\n                └─ kernfs_remove_by_name()\n                   └─ kernfs_remove_by_name_ns()\n```\n\n### 1. UCSI disconnect path\n\n`drivers/usb/typec/ucsi/ucsi.c`:\n\n- `ucsi_handle_connector_change()` processes `UCSI_CONSTAT_CONNECT_CHANGE` at lines **1306–1327**.\n- For a disconnected connector it calls `ucsi_unregister_partner()` at line **1325**.\n- `ucsi_unregister_partner()` calls `typec_unregister_partner(con->partner)` at line **1151**.\n- It then clears `con->partner` at line **1153**.\n\nRelevant source:\n\n```c\ndrivers/usb/typec/ucsi/ucsi.c:1306-1327\nif (change & UCSI_CONSTAT_CONNECT_CHANGE) {\n        ...\n        if (UCSI_CONSTAT(con, CONNECTED)) {\n                ...\n        } else {\n                ucsi_unregister_partner(con);\n        }\n}\n\ndrivers/usb/typec/ucsi/ucsi.c:1138-1154\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n        if (!con->partner)\n                return;\n\n        typec_set_mode(con->port, TYPEC_STATE_SAFE);\n        ...\n        typec_unregister_partner(con->partner);\n        ...\n        con->partner = NULL;\n}\n```\n\n### 2. Type‑C partner teardown\n\n`drivers/usb/typec/class.c:1174-1195`:\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n        struct typec_port *port;\n\n        if (IS_ERR_OR_NULL(partner))\n                return;\n\n        port = to_typec_port(partner->dev.parent);\n\n        mutex_lock(&port->partner_link_lock);\n        if (port->usb2_dev) {\n                typec_partner_unlink_device(partner, port->usb2_dev);\n                port->usb2_dev = NULL;\n        }\n        if (port->usb3_dev) {\n                typec_partner_unlink_device(partner, port->usb3_dev);\n                port->usb3_dev = NULL;\n        }\n\n        device_unregister(&partner->dev);\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThe offending helper is:\n\n```c\ndrivers/usb/typec/class.c:906-913\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n                                        struct device *dev)\n{\n        sysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n        sysfs_remove_link(&dev->kobj, \"typec\");\n\n        if (partner->deattach)\n                partner->deattach(partner, dev);\n}\n```\n\nThe second removal is the one relevant to the warning:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThe corresponding link is created at registration time by:\n\n```c\ndrivers/usb/typec/class.c:888-904\nstatic void typec_partner_link_device(struct typec_partner *partner,\n                                      struct device *dev)\n{\n        int ret;\n\n        ret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n        if (ret)\n                return;\n\n        ret = sysfs_create_link(&partner->dev.kobj, &dev->kobj,\n                                dev_name(dev));\n        ...\n}\n```\n\n### 3. USB disconnect path\n\nThe USB core invokes the Type‑C detach callback before deleting the USB device:\n\n```c\ndrivers/usb/core/hub.c:2315-2364\nvoid usb_disconnect(struct usb_device **pdev)\n{\n        ...\n        typec_deattach(port_dev->connector, &udev->dev);\n        ...\n        device_del(&udev->dev);\n        ...\n}\n```\n\nThe Type‑C detach callback is installed by:\n\n```c\ndrivers/usb/typec/class.c:2744-2753\nmutex_init(&port->partner_link_lock);\n...\nport->con.attach = typec_partner_attach;\nport->con.deattach = typec_partner_deattach;\n```\n\nIts implementation is:\n\n```c\ndrivers/usb/typec/class.c:2169-2186\nstatic void typec_partner_deattach(struct typec_connector *con,\n                                   struct device *dev)\n{\n        struct typec_port *port = container_of(con, struct typec_port, con);\n        struct typec_partner *partner;\n\n        mutex_lock(&port->partner_link_lock);\n        partner = typec_get_partner(port);\n        if (partner) {\n                typec_partner_unlink_device(partner, dev);\n                put_device(&partner->dev);\n        }\n\n        if (port->usb2_dev == dev)\n                port->usb2_dev = NULL;\n        else if (port->usb3_dev == dev)\n                port->usb3_dev = NULL;\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThus both paths can remove the same `\"typec\"` link:\n\n1. USB teardown calls `typec_partner_deattach()` and removes it.\n2. UCSI teardown calls `typec_unregister_partner()` and removes it again, or calls it after the USB device's sysfs directory has already disappeared.\n\nThe `partner_link_lock` protects the bookkeeping fields (`usb2_dev` and `usb3_dev`), but it does **not** make the `dev->kobj` sysfs directory immortal. In particular, a USB device can already have had its kobject/sysfs directory removed by `device_del()` while a stale Type‑C link teardown still reaches `typec_partner_unlink_device()`.\n\n## Why the warning says “no directory”\n\n`sysfs_remove_link()` is implemented as:\n\n```c\nfs/sysfs/symlink.c:143-154\nvoid sysfs_remove_link(struct kobject *kobj, const char *name)\n{\n        struct kernfs_node *parent = NULL;\n\n        if (!kobj)\n                parent = sysfs_root_kn;\n        else\n                parent = kobj->sd;\n\n        kernfs_remove_by_name(parent, name);\n}\n```\n\n`kobj->sd` is the kernfs directory for the kobject. Once the device has been removed from sysfs, `dev->kobj.sd` is `NULL`.\n\nThe kernfs wrapper then explicitly warns:\n\n```c\nfs/kernfs/dir.c:1724-1734\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n                             const struct ns_common *ns)\n{\n        ...\n        if (!parent) {\n                WARN(1, KERN_WARNING\n                     \"kernfs: can not remove '%s', no directory\\n\", name);\n                return -ENOENT;\n        }\n        ...\n}\n```\n\nTherefore:\n\n```text\ndev->kobj.sd == NULL\n        ↓\nsysfs_remove_link(&dev->kobj, \"typec\")\n        ↓\nkernfs_remove_by_name(NULL, \"typec\")\n        ↓\nkernfs_remove_by_name_ns(NULL, \"typec\", NULL)\n        ↓\nwarning + -ENOENT\n```\n\nThe warning is consequently produced by the `typec_partner_unlink_device()` call at **`drivers/usb/typec/class.c:909`**, not by UCSI itself.\n\n## Fix status\n\nThe fix is to make Type‑C partner unlinking tolerate a device whose sysfs directory has already gone away, rather than unconditionally calling `sysfs_remove_link()` on its kobject.\n\nThe relevant upstream fix is the Type‑C series that changes partner link teardown to use the device's registration/sysfs state before removing the `\"typec\"` link—i.e. the fix for the `typec_partner_unlink_device()` / USB disconnect race. The affected function in this tree is still the unguarded version at:\n\n```text\ndrivers/usb/typec/class.c:906-913\n```\n\nand this tree therefore does **not** contain the fix.\n\nIn current upstream code the fix is represented by the Type‑C partner-link cleanup series, whose essential change is to avoid removing the link through a kobject with no `sd` directory (and to make the detach/unlink bookkeeping idempotent). The kernel tree provided here retains the pre-fix implementation, so a 6.17.0-1011-oem build based on it can still emit this warning.\n\n### Bottom line\n\n- **Offending Type‑C function:** `typec_partner_unlink_device()` at `drivers/usb/typec/class.c:906`.\n- **Offending statement:** `sysfs_remove_link(&dev->kobj, \"typec\")` at line **909**.\n- **UCSI caller:** `ucsi_unregister_partner()` at `drivers/usb/typec/ucsi/ucsi.c:1138-1154`.\n- **Workqueue caller:** `ucsi_handle_connector_change()` at `drivers/usb/typec/ucsi/ucsi.c:1264-1364`, line **1325**.\n- **Underlying reason:** the USB device's kernfs directory has already been removed, so `dev->kobj.sd` is `NULL`.\n- **Observed errno:** `kernfs_remove_by_name_ns()` returns `-ENOENT`, intentionally accompanied by the warning at `fs/kernfs/dir.c:1730-1734`.\n- **Tree status:** the supplied tree still has the vulnerable implementation.\n- **Upstream status:** an upstream Type‑C partner-link teardown fix exists; it makes this path safe/idempotent when USB and UCSI teardown overlap.",
+      "usage": {
+        "input": 3,
+        "output": 2531,
+        "cacheRead": 46111,
+        "cacheWrite": 24518,
+        "reasoning": 454,
+        "totalTokens": 73163,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0015186,
+          "cacheRead": 0.00046111000000000004,
+          "cacheWrite": 0.00306475,
+          "total": 0.0050447600000000006
+        }
+      }
     }
   ],
   "aggregate": {

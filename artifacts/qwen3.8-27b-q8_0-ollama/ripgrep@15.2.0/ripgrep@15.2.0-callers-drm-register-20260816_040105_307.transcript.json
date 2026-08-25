@@ -29,7 +29,22 @@
             "command": "cd /workspace && ls && rg --version"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 1870,
+        "output": 59,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1929,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -65,7 +80,22 @@
             "command": "cd /workspace/linux && rg -n '\\bpm_runtime_get_sync\\s*\\(' drivers/gpu/drm/i915 --no-heading"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2026,
+        "output": 133,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 2159,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -112,7 +142,22 @@
             "command": "cd /workspace/linux && for n in 172 475 506; do awk -v t=$n 'NR<=t && /^[a-zA-Z_].*\\(/ {line=NR\": \"$0} NR==t{print line}' drivers/gpu/drm/i915/intel_runtime_pm.c; done; awk 'NR<=198 && /^[a-zA-Z_].*\\(/ {line=NR\": \"$0} NR==198{print line}' drivers/gpu/drm/i915/selftests/mock_gem_device.c; awk 'NR<=531 && /^[a-zA-Z_].*\\(/ {line=NR\": \"$0} NR==531{print line}' drivers/gpu/drm/i915/gt/intel_rc6.c"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2459,
+        "output": 352,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 2811,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -152,7 +197,22 @@
             "command": "cd /workspace/linux && for f in i915_driver_register __intel_runtime_pm_get intel_runtime_pm_enable intel_runtime_pm_disable mock_gem_device; do echo \"=== callers of $f ===\"; rg -n \"\\b$f\\s*\\(\" drivers/gpu/drm/i915 --no-heading; done; echo \"=== definitions of rpm_get ===\"; rg -n '\\brpm_get\\b' drivers/gpu/drm/i915 --no-heading"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2945,
+        "output": 321,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 3266,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -181,7 +241,22 @@
             "command": "cd /workspace/linux && for n in 895 661 681 1029; do awk -v t=$n 'NR<=t && /^[a-zA-Z_].*\\(/ {line=NR\": \"$0} NR==t{print line}' drivers/gpu/drm/i915/i915_driver.c; done; for n in 276 293; do awk -v t=$n 'NR<=t && /^[a-zA-Z_].*\\(/ {line=NR\": \"$0} NR==t{print line}' drivers/gpu/drm/i915/intel_runtime_pm.c; done; for n in 601 626 717; do awk -v t=$n 'NR<=t && /^[a-zA-Z_].*\\(/ {line=NR\": \"$0} NR==t{print line}' drivers/gpu/drm/i915/gt/intel_rc6.c; done"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 4287,
+        "output": 400,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 4687,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -210,7 +285,22 @@
             "command": "cd /workspace/linux && sed -n '655,685p' drivers/gpu/drm/i915/i915_driver.c; echo ---; sed -n '620,630p' drivers/gpu/drm/i915/gt/intel_rc6.c"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 4899,
+        "output": 245,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 5144,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -230,7 +320,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "Confirmed. Callers one hop up:\n\n1. i915_driver_register ← i915_driver_probe (line 895)\n2. __intel_runtime_pm_get ← intel_runtime_pm_get_raw (276), intel_runtime_pm_get (293)\n3. intel_runtime_pm_enable ← i915_driver_register (661)\n4. intel_runtime_pm_disable ← i915_driver_unregister (681), i915_driver_shutdown (1029)\n5. mock_gem_device ← numerous self-tests\n6. rpm_get (intel_rc6.c) ← intel_rc6_init (601), intel_rc6_sanitize (626), intel_rc6_disable (717)\n\nCycles: no cycles in the direct caller→caller graph. intel_runtime_pm_enable is called from i915_driver_register, which calls drm_dev_register — no cycle. No cycles in the one-hop graph. Report: no cycles.\n## Direct callers (in `drivers/gpu/drm/i915`)\n\n**Callers of `drm_dev_register`:**\n| Function | Location |\n|---|---|\n| `i915_driver_register` | `i915_driver.c:622` (call at :635) |\n\n**Callers of `pm_runtime_get_sync`:**\n| Function | Location |\n|---|---|\n| `__intel_runtime_pm_get` | `intel_runtime_pm.c:166` (call at :172) |\n| `intel_runtime_pm_enable` | `intel_runtime_pm.c:447` (call at :475) |\n| `intel_runtime_pm_disable` | `intel_runtime_pm.c:500` (call at :506, via `drm_WARN`) |\n| `mock_gem_device` | `selftests/mock_gem_device.c:141` (call at :198) |\n| `rpm_get` | `gt/intel_rc6.c:528` (call at :531) |\n\n## One hop up (callers of each direct caller)\n\n- **`i915_driver_register`** ← \n  - `i915_driver_probe` (`i915_driver.c:895`)\n- **`__intel_runtime_pm_get`** ←\n  - `intel_runtime_pm_get_raw` (`intel_runtime_pm.c:276`)\n  - `intel_runtime_pm_get` (`intel_runtime_pm.c:293`)\n- **`intel_runtime_pm_enable`** ←\n  - `i915_driver_register` (`i915_driver.c:661`) — note this creates an edge `i915_driver_register → intel_runtime_pm_enable`, but enable() doesn't call back into register()\n- **`intel_runtime_pm_disable`** ←\n  - `i915_driver_unregister` (`i915_driver.c:681`)\n  - `i915_driver_shutdown` (`i915_driver.c:1029`)\n- **`mock_gem_device`** ← (self-test callers)\n  - `gt/selftest_timeline.c:157`, `selftests/i915_gem_gtt.c:1935`, `selftests/i915_vma.c:934`, `selftests/i915_gem_evict.c:550`, `selftests/intel_memory_region.c:1355`, `selftests/i915_request.c:556`, `gem/selftests/i915_gem_dmabuf.c:540`, `gem/selftests/huge_pages.c:1967`, `gem/selftests/i915_gem_phys.c:79`, `gem/selftests/i915_gem_object.c:82`\n- **`rpm_get`** (static, `intel_rc6.c`) ←\n  - `intel_rc6_init` (`intel_rc6.c:601`)\n  - `intel_rc6_sanitize` (`intel_rc6.c:626`)\n  - `intel_rc6_disable` (`intel_rc6.c:717`)\n\n## Call cycles\n\n**None found.** The only intra-cluster edges are `i915_driver_register → intel_runtime_pm_enable` and `i915_driver_unregister/shutdown → intel_runtime_pm_disable`, and neither of those callbacks back into `i915_driver_register` or `drm_dev_register`/`pm_runtime_get_sync` callers, so no cycle exists in this call graph."
+      "content": "Confirmed. Callers one hop up:\n\n1. i915_driver_register ← i915_driver_probe (line 895)\n2. __intel_runtime_pm_get ← intel_runtime_pm_get_raw (276), intel_runtime_pm_get (293)\n3. intel_runtime_pm_enable ← i915_driver_register (661)\n4. intel_runtime_pm_disable ← i915_driver_unregister (681), i915_driver_shutdown (1029)\n5. mock_gem_device ← numerous self-tests\n6. rpm_get (intel_rc6.c) ← intel_rc6_init (601), intel_rc6_sanitize (626), intel_rc6_disable (717)\n\nCycles: no cycles in the direct caller→caller graph. intel_runtime_pm_enable is called from i915_driver_register, which calls drm_dev_register — no cycle. No cycles in the one-hop graph. Report: no cycles.\n## Direct callers (in `drivers/gpu/drm/i915`)\n\n**Callers of `drm_dev_register`:**\n| Function | Location |\n|---|---|\n| `i915_driver_register` | `i915_driver.c:622` (call at :635) |\n\n**Callers of `pm_runtime_get_sync`:**\n| Function | Location |\n|---|---|\n| `__intel_runtime_pm_get` | `intel_runtime_pm.c:166` (call at :172) |\n| `intel_runtime_pm_enable` | `intel_runtime_pm.c:447` (call at :475) |\n| `intel_runtime_pm_disable` | `intel_runtime_pm.c:500` (call at :506, via `drm_WARN`) |\n| `mock_gem_device` | `selftests/mock_gem_device.c:141` (call at :198) |\n| `rpm_get` | `gt/intel_rc6.c:528` (call at :531) |\n\n## One hop up (callers of each direct caller)\n\n- **`i915_driver_register`** ← \n  - `i915_driver_probe` (`i915_driver.c:895`)\n- **`__intel_runtime_pm_get`** ←\n  - `intel_runtime_pm_get_raw` (`intel_runtime_pm.c:276`)\n  - `intel_runtime_pm_get` (`intel_runtime_pm.c:293`)\n- **`intel_runtime_pm_enable`** ←\n  - `i915_driver_register` (`i915_driver.c:661`) — note this creates an edge `i915_driver_register → intel_runtime_pm_enable`, but enable() doesn't call back into register()\n- **`intel_runtime_pm_disable`** ←\n  - `i915_driver_unregister` (`i915_driver.c:681`)\n  - `i915_driver_shutdown` (`i915_driver.c:1029`)\n- **`mock_gem_device`** ← (self-test callers)\n  - `gt/selftest_timeline.c:157`, `selftests/i915_gem_gtt.c:1935`, `selftests/i915_vma.c:934`, `selftests/i915_gem_evict.c:550`, `selftests/intel_memory_region.c:1355`, `selftests/i915_request.c:556`, `gem/selftests/i915_gem_dmabuf.c:540`, `gem/selftests/huge_pages.c:1967`, `gem/selftests/i915_gem_phys.c:79`, `gem/selftests/i915_gem_object.c:82`\n- **`rpm_get`** (static, `intel_rc6.c`) ←\n  - `intel_rc6_init` (`intel_rc6.c:601`)\n  - `intel_rc6_sanitize` (`intel_rc6.c:626`)\n  - `intel_rc6_disable` (`intel_rc6.c:717`)\n\n## Call cycles\n\n**None found.** The only intra-cluster edges are `i915_driver_register → intel_runtime_pm_enable` and `i915_driver_unregister/shutdown → intel_runtime_pm_disable`, and neither of those callbacks back into `i915_driver_register` or `drm_dev_register`/`pm_runtime_get_sync` callers, so no cycle exists in this call graph.",
+      "usage": {
+        "input": 5448,
+        "output": 1002,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 6450,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
     }
   ],
   "aggregate": {

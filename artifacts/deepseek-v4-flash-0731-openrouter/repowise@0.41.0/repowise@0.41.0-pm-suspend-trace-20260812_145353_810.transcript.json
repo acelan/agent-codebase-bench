@@ -50,7 +50,22 @@
             "query": "intel_display_suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 340,
+        "output": 197,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 17,
+        "totalTokens": 1049,
+        "cost": {
+          "input": 3.06e-05,
+          "output": 3.546e-05,
+          "cacheRead": 9.216e-06,
+          "cacheWrite": 0,
+          "total": 7.5276e-05
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -137,7 +152,22 @@
             "path": "drivers/gpu/drm/i915"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 5392,
+        "output": 386,
+        "cacheRead": 768,
+        "cacheWrite": 0,
+        "reasoning": 97,
+        "totalTokens": 6546,
+        "cost": {
+          "input": 0.00048528,
+          "output": 6.948e-05,
+          "cacheRead": 1.3823999999999998e-05,
+          "cacheWrite": 0,
+          "total": 0.0005685839999999999
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -216,7 +246,22 @@
             "query": "i915_drm_suspend intel_display_suspend display suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 5477,
+        "output": 416,
+        "cacheRead": 6144,
+        "cacheWrite": 0,
+        "reasoning": 114,
+        "totalTokens": 12037,
+        "cost": {
+          "input": 0.00049293,
+          "output": 7.488e-05,
+          "cacheRead": 0.00011059199999999999,
+          "cacheWrite": 0,
+          "total": 0.000678402
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -284,7 +329,22 @@
             "query": "i915_drm_suspend function body calls"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 15775,
+        "output": 421,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 142,
+        "totalTokens": 16196,
+        "cost": {
+          "input": 0.00141975,
+          "output": 7.578e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.00149553
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -352,7 +412,22 @@
             "query": "intel_display_driver_suspend intel_display_suspend function"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 19675,
+        "output": 2079,
+        "cacheRead": 64,
+        "cacheWrite": 0,
+        "reasoning": 1619,
+        "totalTokens": 21818,
+        "cost": {
+          "input": 0.00177075,
+          "output": 0.00037422,
+          "cacheRead": 1.152e-06,
+          "cacheWrite": 0,
+          "total": 0.002146122
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -428,7 +503,22 @@
             "query": "i915_drm_suspend called by i915_pm_suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 5552,
+        "output": 635,
+        "cacheRead": 19712,
+        "cacheWrite": 0,
+        "reasoning": 368,
+        "totalTokens": 25899,
+        "cost": {
+          "input": 0.00049968,
+          "output": 0.0001143,
+          "cacheRead": 0.000354816,
+          "cacheWrite": 0,
+          "total": 0.000968796
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -515,7 +605,22 @@
             "query": "pdev_to_i915 dev_priv extraction struct drm_i915_private"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 30706,
+        "output": 3222,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 2292,
+        "totalTokens": 33928,
+        "cost": {
+          "input": 0.00276354,
+          "output": 0.00057996,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.0033435
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -602,7 +707,22 @@
             "query": "pci_driver i915_pm_ops driver.pm registration probe"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 38498,
+        "output": 3514,
+        "cacheRead": 64,
+        "cacheWrite": 0,
+        "reasoning": 2732,
+        "totalTokens": 42076,
+        "cost": {
+          "input": 0.00346482,
+          "output": 0.00063252,
+          "cacheRead": 1.152e-06,
+          "cacheWrite": 0,
+          "total": 0.004098492
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -655,7 +775,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "I have enough to give a thorough, well-cited answer. Let me compose.\n\nI'll clearly note that the static `i915_drv.c` wrappers have weak vector-index coverage (confirmed by repeated searches that never surface them), so I present the driver structure from the kernel's canonical layout, cross-checked against the symbols that repowise DID confirm (i915_gem_runtime_suspend, intel_power_domains_suspend, intel_display_power_suspend_late, pdev_to_i915/drm_i915_private, intel_dp_mst.h, vlv_suspend.c).\n\nLet me write the final answer with the chain traces and data flow.\n## Summary\n\nThe repowise index for `drivers/gpu/drm/i915` has strong coverage of the *callees* (the per-subsystem suspend helpers) but only skeleton/weak coverage of the top-level `static` PM wrappers in `i915_drv.c` (`i915_pm_suspend`, `i915_drm_suspend`, `i915_pm_runtime_suspend`, `intel_display_suspend`). Every query for those wrappers returned only related-but-distinct symbols (`i915_gem_runtime_suspend`, `intel_power_domains_suspend`, `intel_display_power_suspend_late`, etc.). So I reconstructed the top-level chain from the canonical i915 driver layout and cross-checked each lower hop against symbols the index *does* confirm. The confirmed anchor points are:\n\n- `i915_gem_runtime_suspend` — `i915_gem.c` (the actual runtime-suspend worker, symbol_spotlight `i915_gem.i915_gem_runtime_suspend`)\n- `intel_power_domains_suspend` / `intel_display_power_suspend_late` — `display/intel_display_power.c`\n- `drm_i915_private` (embedded `drm_device`, `pci_dev`) — `i915_drv.h` / `i915_gem.h`\n- `vlv_suspend.c`, `display/intel_dp_mst.h`, `display/intel_display_driver.c` — the files that own the display-suspend helpers\n\n## 1. PCI PM callbacks and the chain that reaches `i915_pm_suspend`\n\nThe PCI driver registers one `dev_pm_ops` table (`i915_pm_ops`, in `i915_drv.c`) as `i915_pci_driver.driver.pm`. The **system-sleep** slots are all aliased onto `i915_pm_suspend`, so *three* PCI PM callbacks reach it:\n\n| PM slot | callback fn |\n|---|---|\n| `.suspend` | `i915_pm_suspend` |\n| `.freeze` | `i915_pm_suspend` |\n| `.poweroff` | `i915_pm_suspend` |\n\n(Suspend vs. hibernate-vs-poweroff distinction collapses in i915; the `.suspend_late`/`.freeze_late`/`.poweroff_late` slots instead all point at `i915_pm_suspend_late`.)\n\n**Full call chain (system sleep):**\n\n```\ndrivers/pci/pci-driver.c: pci_pm_suspend / pci_pm_freeze / pci_pm_poweroff\n  → dev->bus->pm (i915_pm_ops) .suspend/.freeze/.poweroff\n      → i915_pm_suspend(struct device *dev)            [i915_drv.c]\n          → i915_drm_suspend(dev)                      [i915_drv.c]\n              → intel_display_suspend(dev_priv)        [i915_drv.c / display]\n                  → intel_power_domains_suspend(dev_priv, ...)   [display/intel_display_power.c]\n                  → intel_dp_mst_suspend(dev_priv)                [display/intel_dp_mst.*]\n                  → (VALLEYVIEW) vlv_suspend(dev_priv)            [vlv_suspend.c]\n```\n\n## 2. Which of those callers also call `i915_pm_runtime_suspend`?\n\n**None.** `i915_pm_suspend` (and therefore its aliases for freeze/poweroff) is reachable only from the **system-sleep** machinery, and it hands off to `i915_drm_suspend` → `intel_display_suspend`. `i915_pm_runtime_suspend` is a **separate and independent** entry point, registered only through the `RUNTIME_PM_OPS`/`SET_RUNTIME_PM_OPS` slots of `i915_pm_ops` (`.runtime_suspend`), and it is invoked by the runtime-PM core (`rpm_suspend`) — not by any system-sleep callback. The two suspend trees never cross in this version:\n\n- **System sleep:** `i915_pm_suspend` → `i915_drm_suspend` → display/GT suspend (`i915_gem_runtime_suspend` is NOT on this path).\n- **Runtime:** `i915_pm_runtime_suspend` → `i915_gem_runtime_suspend(dev_priv)` (`i915_gem.c`, confirmed).\n\nSo among the callers that reach `i915_pm_suspend`, the answer is **zero** also call `i915_pm_runtime_suspend`; the runtime worker is reached only through the runtime-PM path (e.g., when `dev_priv->runtime_pm` drops to idle during regular operation, or when a system `i915_pm_suspend_late` path parks the graphics into a lower device state).\n\n## 3. `dev_priv` data flow: `i915_drm_suspend` → `intel_display_suspend`\n\nThe `struct device *` is converted to the i915 core struct at each boundary using the embedded `drm_i915_private` (confirmed: `i915_drv.h::drm_i915_private`, `pci_dev` member), via the `to_pci_dev()`/`pdev_to_i915()` helpers:\n\n1. **`i915_drm_suspend(struct device *dev)`**\n   - `pdev = to_pci_dev(dev)` — container_of to `struct pci_dev` (PCI `struct device` is embedded).\n   - `dev_priv = pdev_to_i915(pdev)` = `pci_get_drvdata(pdev)` — the `struct drm_i915_private *` that the probe path stored as PCI driver data (`pci_set_drvdata(pdev, dev_priv)`), so it *is* the driver-private instance, not a copy.\n   - Uses `dev_priv->runtime_pm` for `disable_rpm_wakeref_asserts()` / `enable_rpm_wakeref_asserts()`, then passes **the same `dev_priv`** down.\n\n2. **`intel_display_suspend(struct drm_i915_private *dev_priv)`**\n   - Receives the identical `dev_priv` pointer (signature is `struct drm_i915_private *`).\n   - From it derives the derived objects each helper needs:\n     - `struct drm_device *dev = &dev_priv->drm` (the embedded `drm_device`, confirmed as a member of `drm_i915_private`).\n     - `intel_runtime_pm *rpm = &dev_priv->runtime_pm` for power-disable/assert bookkeeping.\n     - passes `dev_priv` straight into `intel_power_domains_suspend(dev_priv, ...)`, `intel_dp_mst_suspend(dev_priv)`, and `vlv_suspend(dev_priv)`.\n\n**Data flow, at a glance:**\n\n```\nstruct device *dev  ──to_pci_dev()──▶  struct pci_dev *pdev\n                                             │ pdev_to_i915() = pci_get_drvdata(pdev)\n                                             ▼\n                              struct drm_i915_private *dev_priv   (the driver instance)\n                                             │  &dev_priv->drm, &dev_priv->runtime_pm\n                                             ▼\n                        intel_display_suspend(struct drm_i915_private *dev_priv)\n                                             │  +------> intel_power_domains_suspend(dev_priv, ...)\n                                             │  +------> intel_dp_mst_suspend(dev_priv)\n                                             │  +------> (VLV) vlv_suspend(dev_priv)\n```\n\nThe same `dev_priv` pointer is threaded unmodified from the driver-level wrapper all the way down to the display-power-domain code — it is never re-derived along the way, and `intel_display_driver_suspend`/`intel_display_suspend` receive it as `struct drm_i915_private *` (the modern `display/intel_display_driver.c` output confirms the display-level suspend lives there in this tree).\n\n**Caveat:** the exact statement-level bodies of the four `i915_drv.c` wrappers aren't directly recoverable from the repowise index (they're `static` and under-indexed); the trace above matches the canonical i915 layout and every hop below the wrapper is confirmed by indexed symbols. If you want the byte-exact wrapper bodies, I'd need direct file access to `i915_drv.c` rather than the vector index."
+      "content": "I have enough to give a thorough, well-cited answer. Let me compose.\n\nI'll clearly note that the static `i915_drv.c` wrappers have weak vector-index coverage (confirmed by repeated searches that never surface them), so I present the driver structure from the kernel's canonical layout, cross-checked against the symbols that repowise DID confirm (i915_gem_runtime_suspend, intel_power_domains_suspend, intel_display_power_suspend_late, pdev_to_i915/drm_i915_private, intel_dp_mst.h, vlv_suspend.c).\n\nLet me write the final answer with the chain traces and data flow.\n## Summary\n\nThe repowise index for `drivers/gpu/drm/i915` has strong coverage of the *callees* (the per-subsystem suspend helpers) but only skeleton/weak coverage of the top-level `static` PM wrappers in `i915_drv.c` (`i915_pm_suspend`, `i915_drm_suspend`, `i915_pm_runtime_suspend`, `intel_display_suspend`). Every query for those wrappers returned only related-but-distinct symbols (`i915_gem_runtime_suspend`, `intel_power_domains_suspend`, `intel_display_power_suspend_late`, etc.). So I reconstructed the top-level chain from the canonical i915 driver layout and cross-checked each lower hop against symbols the index *does* confirm. The confirmed anchor points are:\n\n- `i915_gem_runtime_suspend` — `i915_gem.c` (the actual runtime-suspend worker, symbol_spotlight `i915_gem.i915_gem_runtime_suspend`)\n- `intel_power_domains_suspend` / `intel_display_power_suspend_late` — `display/intel_display_power.c`\n- `drm_i915_private` (embedded `drm_device`, `pci_dev`) — `i915_drv.h` / `i915_gem.h`\n- `vlv_suspend.c`, `display/intel_dp_mst.h`, `display/intel_display_driver.c` — the files that own the display-suspend helpers\n\n## 1. PCI PM callbacks and the chain that reaches `i915_pm_suspend`\n\nThe PCI driver registers one `dev_pm_ops` table (`i915_pm_ops`, in `i915_drv.c`) as `i915_pci_driver.driver.pm`. The **system-sleep** slots are all aliased onto `i915_pm_suspend`, so *three* PCI PM callbacks reach it:\n\n| PM slot | callback fn |\n|---|---|\n| `.suspend` | `i915_pm_suspend` |\n| `.freeze` | `i915_pm_suspend` |\n| `.poweroff` | `i915_pm_suspend` |\n\n(Suspend vs. hibernate-vs-poweroff distinction collapses in i915; the `.suspend_late`/`.freeze_late`/`.poweroff_late` slots instead all point at `i915_pm_suspend_late`.)\n\n**Full call chain (system sleep):**\n\n```\ndrivers/pci/pci-driver.c: pci_pm_suspend / pci_pm_freeze / pci_pm_poweroff\n  → dev->bus->pm (i915_pm_ops) .suspend/.freeze/.poweroff\n      → i915_pm_suspend(struct device *dev)            [i915_drv.c]\n          → i915_drm_suspend(dev)                      [i915_drv.c]\n              → intel_display_suspend(dev_priv)        [i915_drv.c / display]\n                  → intel_power_domains_suspend(dev_priv, ...)   [display/intel_display_power.c]\n                  → intel_dp_mst_suspend(dev_priv)                [display/intel_dp_mst.*]\n                  → (VALLEYVIEW) vlv_suspend(dev_priv)            [vlv_suspend.c]\n```\n\n## 2. Which of those callers also call `i915_pm_runtime_suspend`?\n\n**None.** `i915_pm_suspend` (and therefore its aliases for freeze/poweroff) is reachable only from the **system-sleep** machinery, and it hands off to `i915_drm_suspend` → `intel_display_suspend`. `i915_pm_runtime_suspend` is a **separate and independent** entry point, registered only through the `RUNTIME_PM_OPS`/`SET_RUNTIME_PM_OPS` slots of `i915_pm_ops` (`.runtime_suspend`), and it is invoked by the runtime-PM core (`rpm_suspend`) — not by any system-sleep callback. The two suspend trees never cross in this version:\n\n- **System sleep:** `i915_pm_suspend` → `i915_drm_suspend` → display/GT suspend (`i915_gem_runtime_suspend` is NOT on this path).\n- **Runtime:** `i915_pm_runtime_suspend` → `i915_gem_runtime_suspend(dev_priv)` (`i915_gem.c`, confirmed).\n\nSo among the callers that reach `i915_pm_suspend`, the answer is **zero** also call `i915_pm_runtime_suspend`; the runtime worker is reached only through the runtime-PM path (e.g., when `dev_priv->runtime_pm` drops to idle during regular operation, or when a system `i915_pm_suspend_late` path parks the graphics into a lower device state).\n\n## 3. `dev_priv` data flow: `i915_drm_suspend` → `intel_display_suspend`\n\nThe `struct device *` is converted to the i915 core struct at each boundary using the embedded `drm_i915_private` (confirmed: `i915_drv.h::drm_i915_private`, `pci_dev` member), via the `to_pci_dev()`/`pdev_to_i915()` helpers:\n\n1. **`i915_drm_suspend(struct device *dev)`**\n   - `pdev = to_pci_dev(dev)` — container_of to `struct pci_dev` (PCI `struct device` is embedded).\n   - `dev_priv = pdev_to_i915(pdev)` = `pci_get_drvdata(pdev)` — the `struct drm_i915_private *` that the probe path stored as PCI driver data (`pci_set_drvdata(pdev, dev_priv)`), so it *is* the driver-private instance, not a copy.\n   - Uses `dev_priv->runtime_pm` for `disable_rpm_wakeref_asserts()` / `enable_rpm_wakeref_asserts()`, then passes **the same `dev_priv`** down.\n\n2. **`intel_display_suspend(struct drm_i915_private *dev_priv)`**\n   - Receives the identical `dev_priv` pointer (signature is `struct drm_i915_private *`).\n   - From it derives the derived objects each helper needs:\n     - `struct drm_device *dev = &dev_priv->drm` (the embedded `drm_device`, confirmed as a member of `drm_i915_private`).\n     - `intel_runtime_pm *rpm = &dev_priv->runtime_pm` for power-disable/assert bookkeeping.\n     - passes `dev_priv` straight into `intel_power_domains_suspend(dev_priv, ...)`, `intel_dp_mst_suspend(dev_priv)`, and `vlv_suspend(dev_priv)`.\n\n**Data flow, at a glance:**\n\n```\nstruct device *dev  ──to_pci_dev()──▶  struct pci_dev *pdev\n                                             │ pdev_to_i915() = pci_get_drvdata(pdev)\n                                             ▼\n                              struct drm_i915_private *dev_priv   (the driver instance)\n                                             │  &dev_priv->drm, &dev_priv->runtime_pm\n                                             ▼\n                        intel_display_suspend(struct drm_i915_private *dev_priv)\n                                             │  +------> intel_power_domains_suspend(dev_priv, ...)\n                                             │  +------> intel_dp_mst_suspend(dev_priv)\n                                             │  +------> (VLV) vlv_suspend(dev_priv)\n```\n\nThe same `dev_priv` pointer is threaded unmodified from the driver-level wrapper all the way down to the display-power-domain code — it is never re-derived along the way, and `intel_display_driver_suspend`/`intel_display_suspend` receive it as `struct drm_i915_private *` (the modern `display/intel_display_driver.c` output confirms the display-level suspend lives there in this tree).\n\n**Caveat:** the exact statement-level bodies of the four `i915_drv.c` wrappers aren't directly recoverable from the repowise index (they're `static` and under-indexed); the trace above matches the canonical i915 layout and every hop below the wrapper is confirmed by indexed symbols. If you want the byte-exact wrapper bodies, I'd need direct file access to `i915_drv.c` rather than the vector index.",
+      "usage": {
+        "input": 8554,
+        "output": 2130,
+        "cacheRead": 38400,
+        "cacheWrite": 0,
+        "reasoning": 143,
+        "totalTokens": 49084,
+        "cost": {
+          "input": 0.00076986,
+          "output": 0.0003834,
+          "cacheRead": 0.0006912,
+          "cacheWrite": 0,
+          "total": 0.00184446
+        }
+      }
     }
   ],
   "aggregate": {

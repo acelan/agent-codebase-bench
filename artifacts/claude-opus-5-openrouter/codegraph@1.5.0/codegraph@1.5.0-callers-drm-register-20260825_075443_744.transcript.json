@@ -36,7 +36,22 @@
             "query": "pm_runtime_get_sync callers"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 128,
+        "cacheRead": 963,
+        "cacheWrite": 156,
+        "reasoning": 0,
+        "totalTokens": 1249,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.0032,
+          "cacheRead": 0.0004815,
+          "cacheWrite": 0.000975,
+          "total": 0.0046665000000000005
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -83,7 +98,22 @@
             "query": "drivers/gpu/drm/i915 pm_runtime_get_sync call sites"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 174,
+        "cacheRead": 1119,
+        "cacheWrite": 22663,
+        "reasoning": 27,
+        "totalTokens": 23958,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.004350000000000001,
+          "cacheRead": 0.0005595,
+          "cacheWrite": 0.14164375,
+          "total": 0.14656325
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -123,7 +153,22 @@
             "query": "i915_driver_register intel_runtime_pm_get_raw runtime_pm_get_raw i915 drm_dev_register"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 309,
+        "cacheRead": 23782,
+        "cacheWrite": 17372,
+        "reasoning": 219,
+        "totalTokens": 41465,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.007725,
+          "cacheRead": 0.011890999999999999,
+          "cacheWrite": 0.108575,
+          "total": 0.128201
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -152,7 +197,22 @@
             "query": "intel_runtime_pm_disable callers i915_driver_unregister"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 418,
+        "cacheRead": 41154,
+        "cacheWrite": 11720,
+        "reasoning": 347,
+        "totalTokens": 53294,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.010450000000000001,
+          "cacheRead": 0.020576999999999998,
+          "cacheWrite": 0.07325,
+          "total": 0.10428699999999999
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -172,7 +232,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "## Direct callers in `drivers/gpu/drm/i915`\n\n### `drm_dev_register` — 1 direct caller\n| Direct caller | Location |\n|---|---|\n| `i915_driver_register` | `drivers/gpu/drm/i915/i915_driver.c:635` |\n\nOne hop up:\n- `i915_driver_register` ← `i915_driver_probe` (`i915_driver.c:895`)\n  - (`i915_driver_probe` ← `i915_pci_probe` in `i915_pci.c` — pci_driver `.probe` entry point)\n\n### `pm_runtime_get_sync` — 3 direct callers (all in `intel_runtime_pm.c`)\n| Direct caller | Location |\n|---|---|\n| `__intel_runtime_pm_get` | `intel_runtime_pm.c:172` |\n| `intel_runtime_pm_enable` | `intel_runtime_pm.c:475` |\n| `intel_runtime_pm_disable` | `intel_runtime_pm.c:506` |\n\nOne hop up:\n- `__intel_runtime_pm_get` ←\n  - `intel_runtime_pm_get_raw` (`intel_runtime_pm.c:276`)\n  - `intel_runtime_pm_get` (`intel_runtime_pm.c:293`)\n- `intel_runtime_pm_enable` ←\n  - `i915_driver_register` (`i915_driver.c:661`)\n- `intel_runtime_pm_disable` ←\n  - `i915_driver_unregister` (`i915_driver.c:681`)\n  - `i915_driver_shutdown` (`i915_driver.c:1029`)\n\nNotable second hop: `intel_runtime_pm_get_raw` ← `i915_display_rpm_get_raw` ← `intel_display_rpm_get_raw`; `intel_runtime_pm_get` ← `i915_display_rpm_get`, `i915_driver_remove` (`i915_driver.c:945`).\n\n### Call cycles\n**None found.** All paths are acyclic:\n\n```\ni915_pci_probe → i915_driver_probe → i915_driver_register → drm_dev_register\n                                                          → intel_runtime_pm_enable → pm_runtime_get_sync\ni915_driver_remove → i915_driver_unregister → intel_runtime_pm_disable → pm_runtime_get_sync\ni915_driver_shutdown → intel_runtime_pm_disable → pm_runtime_get_sync\nintel_runtime_pm_get{,_raw} → __intel_runtime_pm_get → pm_runtime_get_sync\n```\n\nNote: `i915_driver_register` appears in both trees (it calls `drm_dev_register` *and*, via `intel_runtime_pm_enable`, `pm_runtime_get_sync`) — a shared node, but not a cycle. The only re-entrancy risk is the indirect `drm_dev_register → driver->load()` function pointer, but i915 sets no `.load` hook, so that edge is not taken."
+      "content": "## Direct callers in `drivers/gpu/drm/i915`\n\n### `drm_dev_register` — 1 direct caller\n| Direct caller | Location |\n|---|---|\n| `i915_driver_register` | `drivers/gpu/drm/i915/i915_driver.c:635` |\n\nOne hop up:\n- `i915_driver_register` ← `i915_driver_probe` (`i915_driver.c:895`)\n  - (`i915_driver_probe` ← `i915_pci_probe` in `i915_pci.c` — pci_driver `.probe` entry point)\n\n### `pm_runtime_get_sync` — 3 direct callers (all in `intel_runtime_pm.c`)\n| Direct caller | Location |\n|---|---|\n| `__intel_runtime_pm_get` | `intel_runtime_pm.c:172` |\n| `intel_runtime_pm_enable` | `intel_runtime_pm.c:475` |\n| `intel_runtime_pm_disable` | `intel_runtime_pm.c:506` |\n\nOne hop up:\n- `__intel_runtime_pm_get` ←\n  - `intel_runtime_pm_get_raw` (`intel_runtime_pm.c:276`)\n  - `intel_runtime_pm_get` (`intel_runtime_pm.c:293`)\n- `intel_runtime_pm_enable` ←\n  - `i915_driver_register` (`i915_driver.c:661`)\n- `intel_runtime_pm_disable` ←\n  - `i915_driver_unregister` (`i915_driver.c:681`)\n  - `i915_driver_shutdown` (`i915_driver.c:1029`)\n\nNotable second hop: `intel_runtime_pm_get_raw` ← `i915_display_rpm_get_raw` ← `intel_display_rpm_get_raw`; `intel_runtime_pm_get` ← `i915_display_rpm_get`, `i915_driver_remove` (`i915_driver.c:945`).\n\n### Call cycles\n**None found.** All paths are acyclic:\n\n```\ni915_pci_probe → i915_driver_probe → i915_driver_register → drm_dev_register\n                                                          → intel_runtime_pm_enable → pm_runtime_get_sync\ni915_driver_remove → i915_driver_unregister → intel_runtime_pm_disable → pm_runtime_get_sync\ni915_driver_shutdown → intel_runtime_pm_disable → pm_runtime_get_sync\nintel_runtime_pm_get{,_raw} → __intel_runtime_pm_get → pm_runtime_get_sync\n```\n\nNote: `i915_driver_register` appears in both trees (it calls `drm_dev_register` *and*, via `intel_runtime_pm_enable`, `pm_runtime_get_sync`) — a shared node, but not a cycle. The only re-entrancy risk is the indirect `drm_dev_register → driver->load()` function pointer, but i915 sets no `.load` hook, so that edge is not taken.",
+      "usage": {
+        "input": 2,
+        "output": 1017,
+        "cacheRead": 52874,
+        "cacheWrite": 11202,
+        "reasoning": 0,
+        "totalTokens": 65095,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.025425,
+          "cacheRead": 0.026437,
+          "cacheWrite": 0.0700125,
+          "total": 0.1218845
+        }
+      }
     }
   ],
   "aggregate": {

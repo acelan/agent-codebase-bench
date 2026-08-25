@@ -36,7 +36,22 @@
             "query": "i915_pm_runtime_suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 125,
+        "cacheRead": 1042,
+        "cacheWrite": 185,
+        "reasoning": 0,
+        "totalTokens": 1354,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.003125,
+          "cacheRead": 0.000521,
+          "cacheWrite": 0.00115625,
+          "total": 0.0048122500000000006
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -83,7 +98,22 @@
             "query": "i915_drm_suspend"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 209,
+        "cacheRead": 1227,
+        "cacheWrite": 4787,
+        "reasoning": 44,
+        "totalTokens": 6225,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.0052250000000000005,
+          "cacheRead": 0.0006135,
+          "cacheWrite": 0.02991875,
+          "total": 0.03576725
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -130,7 +160,22 @@
             "query": "i915_driver.c overview public API suspend entry points"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 176,
+        "cacheRead": 6014,
+        "cacheWrite": 4440,
+        "reasoning": 61,
+        "totalTokens": 10632,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.0044,
+          "cacheRead": 0.0030069999999999997,
+          "cacheWrite": 0.02775,
+          "total": 0.035167000000000004
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -177,7 +222,22 @@
             "query": "i915_driver.c file page symbol table functions list"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 2,
+        "output": 252,
+        "cacheRead": 10454,
+        "cacheWrite": 3658,
+        "reasoning": 126,
+        "totalTokens": 14366,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.0063,
+          "cacheRead": 0.005227,
+          "cacheWrite": 0.0228625,
+          "total": 0.0343995
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -208,7 +268,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "I'm realizing the index only contains wiki pages and file references, not the actual symbol definitions themselves. Multiple searches haven't turned up the specific functions like i915_pm_suspend or i915_drm_suspend—just fuzzy matches that don't help. Without a way to read the actual source files, I can't trace the call chain, so I should be upfront about these limitations rather than speculate.\nI ran six repowise queries and could **not** substantiate the requested trace. Here's what happened and why I'm not going to give you a call chain.\n\n## Queries run\n\n| Query | Result |\n|---|---|\n| `i915_pm_suspend` | no matching symbol; top hits were `i915_gem_pm.c` file page, `i915_gem_runtime_suspend`, `intel_power_domains_suspend` |\n| `i915_pm_runtime_suspend` | same fuzzy set; no such symbol |\n| `i915_pm_ops dev_pm_ops PCI suspend resume callbacks` | `intel_power_domains_resume`, `intel_pxp_pm.c`, `vlv_suspend.h` — no PM ops table |\n| `i915_drm_suspend` | no matching symbol; `vlv_suspend.c`, `i915_driver.c` file pages only |\n| `intel_display_suspend` | no matching symbol; returned `intel_display_power_suspend`, `intel_display_power_suspend_late`, `intel_uncore_suspend` |\n| `static int i915_pm_suspend(struct device *kdev)` | nothing relevant |\n\n## Why I can't answer\n\n1. **The three anchor symbols in your question — `i915_pm_suspend`, `i915_pm_runtime_suspend`, `i915_drm_suspend`, and `intel_display_suspend` — are not present in the repowise index.** These are `static` functions in `i915_driver.c` and `display/intel_display_driver.c`; the index appears to cover exported/public API symbols plus per-file summary pages, so file-local statics aren't indexed as symbols. The `i915_driver.c` page came back as a generic \"Overview\" snippet with no function list.\n\n2. **repowise returns summary pages with file:line pointers, not function bodies or a call graph.** Even for the symbols it does have (e.g. `intel_power_domains_suspend`), I get a spotlight page — not callers/callees. There is no call-edge data to trace, and no `pci_driver`/`dev_pm_ops` initializer content to enumerate the PCI PM callbacks from.\n\n3. **I have no file-read tool in this session.** The tool list is repowise only, so I cannot open `i915_driver.c` to read the `i915_pm_ops` table or follow `dev_priv` through the suspend path. Every part of your question — the callback set, the callers that also invoke `i915_pm_runtime_suspend`, and the `dev_priv` data flow — requires reading actual source.\n\nProducing the chain from memory of upstream i915 would be fabrication I can't verify against this tree, and the tree may well differ (the presence of `display/intel_display_rpm.c` and `i915_edram.c` suggests a fairly recent/modified version where the display suspend path has been refactored).\n\n## What would unblock this\n\n- Grant a file-read or grep tool, and I'll read `i915_driver.c` (PM ops table + `i915_drm_suspend`) and `display/intel_display_driver.c` (`intel_display_suspend`) directly and give you the exact chain with line numbers.\n- Or, if repowise can be pointed at a different index granularity that includes static functions and call edges, tell me and I'll re-query."
+      "content": "I'm realizing the index only contains wiki pages and file references, not the actual symbol definitions themselves. Multiple searches haven't turned up the specific functions like i915_pm_suspend or i915_drm_suspend—just fuzzy matches that don't help. Without a way to read the actual source files, I can't trace the call chain, so I should be upfront about these limitations rather than speculate.\nI ran six repowise queries and could **not** substantiate the requested trace. Here's what happened and why I'm not going to give you a call chain.\n\n## Queries run\n\n| Query | Result |\n|---|---|\n| `i915_pm_suspend` | no matching symbol; top hits were `i915_gem_pm.c` file page, `i915_gem_runtime_suspend`, `intel_power_domains_suspend` |\n| `i915_pm_runtime_suspend` | same fuzzy set; no such symbol |\n| `i915_pm_ops dev_pm_ops PCI suspend resume callbacks` | `intel_power_domains_resume`, `intel_pxp_pm.c`, `vlv_suspend.h` — no PM ops table |\n| `i915_drm_suspend` | no matching symbol; `vlv_suspend.c`, `i915_driver.c` file pages only |\n| `intel_display_suspend` | no matching symbol; returned `intel_display_power_suspend`, `intel_display_power_suspend_late`, `intel_uncore_suspend` |\n| `static int i915_pm_suspend(struct device *kdev)` | nothing relevant |\n\n## Why I can't answer\n\n1. **The three anchor symbols in your question — `i915_pm_suspend`, `i915_pm_runtime_suspend`, `i915_drm_suspend`, and `intel_display_suspend` — are not present in the repowise index.** These are `static` functions in `i915_driver.c` and `display/intel_display_driver.c`; the index appears to cover exported/public API symbols plus per-file summary pages, so file-local statics aren't indexed as symbols. The `i915_driver.c` page came back as a generic \"Overview\" snippet with no function list.\n\n2. **repowise returns summary pages with file:line pointers, not function bodies or a call graph.** Even for the symbols it does have (e.g. `intel_power_domains_suspend`), I get a spotlight page — not callers/callees. There is no call-edge data to trace, and no `pci_driver`/`dev_pm_ops` initializer content to enumerate the PCI PM callbacks from.\n\n3. **I have no file-read tool in this session.** The tool list is repowise only, so I cannot open `i915_driver.c` to read the `i915_pm_ops` table or follow `dev_priv` through the suspend path. Every part of your question — the callback set, the callers that also invoke `i915_pm_runtime_suspend`, and the `dev_priv` data flow — requires reading actual source.\n\nProducing the chain from memory of upstream i915 would be fabrication I can't verify against this tree, and the tree may well differ (the presence of `display/intel_display_rpm.c` and `i915_edram.c` suggests a fairly recent/modified version where the display suspend path has been refactored).\n\n## What would unblock this\n\n- Grant a file-read or grep tool, and I'll read `i915_driver.c` (PM ops table + `i915_drm_suspend`) and `display/intel_display_driver.c` (`intel_display_suspend`) directly and give you the exact chain with line numbers.\n- Or, if repowise can be pointed at a different index granularity that includes static functions and call edges, tell me and I'll re-query.",
+      "usage": {
+        "input": 2,
+        "output": 1231,
+        "cacheRead": 14112,
+        "cacheWrite": 3912,
+        "reasoning": 151,
+        "totalTokens": 19257,
+        "cost": {
+          "input": 1e-05,
+          "output": 0.030775,
+          "cacheRead": 0.007056,
+          "cacheWrite": 0.02445,
+          "total": 0.062291
+        }
+      }
     }
   ],
   "aggregate": {

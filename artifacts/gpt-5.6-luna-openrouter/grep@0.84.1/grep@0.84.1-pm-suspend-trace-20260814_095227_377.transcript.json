@@ -44,7 +44,22 @@
             "limit": 200
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 987,
+        "output": 155,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 30,
+        "totalTokens": 1142,
+        "cost": {
+          "input": 9.870000000000001e-05,
+          "output": 9.3e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.0001917
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -107,7 +122,22 @@
             "limit": 200
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 256,
+        "cacheRead": 0,
+        "cacheWrite": 16710,
+        "reasoning": 56,
+        "totalTokens": 16969,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001536,
+          "cacheRead": 0,
+          "cacheWrite": 0.00208875,
+          "total": 0.0022426499999999997
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -179,7 +209,22 @@
             "limit": 50
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 170,
+        "cacheRead": 16710,
+        "cacheWrite": 12234,
+        "reasoning": 35,
+        "totalTokens": 29117,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.000102,
+          "cacheRead": 0.0001671,
+          "cacheWrite": 0.00152925,
+          "total": 0.00179865
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -221,7 +266,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "**Clarifying driver functions**\n\nI need to address that the user mentioned \"intel_display_suspend,\" but they likely meant \"intel_display_driver_suspend.\" Also, \"from every PCI PM callback\" points to potential callbacks being PM ops. I think I should make a list of callers, but since they don't call i915_pm_runtime_suspend, it’s a dead end. The runtime callback intel_runtime_suspend is separate, and I also need to trace the full call chain reaching i915_pm_suspend. I'll tag appropriate lines and ensure clarity throughout.\n## PCI PM callbacks that reach `i915_pm_suspend`\n\nThe PCI driver installs `i915_pm_ops` through `i915_pci_driver.driver.pm`:\n\n- `drivers/gpu/drm/i915/i915_pci.c:1025-1031`\n- `drivers/gpu/drm/i915/i915_driver.c:1713-1754`\n\nRelevant PM entries:\n\n```c\n.suspend  = i915_pm_suspend,\n.poweroff = i915_pm_suspend,\n```\n\nTherefore, there are two PM dispatch paths reaching the function:\n\n### 1. System suspend\n\n```text\nPCI PM core\n  → i915_pci_driver.driver.pm\n    → i915_pm_ops.suspend\n      → i915_pm_suspend(struct device *kdev)\n        → kdev_to_i915(kdev)\n        → i915_drm_suspend(&i915->drm)\n          → intel_display_driver_suspend(display)\n```\n\nLocations:\n\n- `.suspend = i915_pm_suspend`: `i915_driver.c:1719`\n- `i915_pm_suspend()`: `i915_driver.c:1392-1405`\n- Call to `i915_drm_suspend()`: `i915_driver.c:1404`\n\n### 2. Hibernation image poweroff\n\n```text\nPCI PM core\n  → i915_pci_driver.driver.pm\n    → i915_pm_ops.poweroff\n      → i915_pm_suspend(struct device *kdev)\n        → kdev_to_i915(kdev)\n        → i915_drm_suspend(&i915->drm)\n          → intel_display_driver_suspend(display)\n```\n\nLocation:\n\n- `.poweroff = i915_pm_suspend`: `i915_driver.c:1745`\n\n`.poweroff` is the same function pointer as `.suspend`, so the call chain after PM dispatch is identical.\n\nOther PM callbacks do **not** reach `i915_pm_suspend`:\n\n```text\n.suspend_late    → i915_pm_suspend_late    → i915_drm_suspend_late()\n.suspend_noirq   → i915_pm_suspend_noirq   → i915_drm_suspend_noirq()\n.poweroff_late   → i915_pm_poweroff_late   → i915_drm_suspend_late(..., true)\n.poweroff_noirq  → i915_pm_poweroff_noirq  → i915_drm_suspend_noirq(..., true)\n.freeze          → i915_pm_freeze          → i915_drm_suspend() directly\n.runtime_suspend → intel_runtime_suspend()\n```\n\n## Callers that also call `i915_pm_runtime_suspend`\n\nNone.\n\nThere is no `i915_pm_runtime_suspend` symbol or call in `drivers/gpu/drm/i915`. The runtime PM callback is instead:\n\n```c\n.runtime_suspend = intel_runtime_suspend,\n```\n\nat `i915_driver.c:1752`.\n\nIt is a separate path and does not call `i915_pm_suspend`:\n\n```text\n.runtime_suspend\n  → intel_runtime_suspend(kdev)\n    → i915_gem_runtime_suspend(dev_priv)\n    → intel_pxp_runtime_suspend(...)\n    → intel_gt_runtime_suspend(...)\n    → intel_irq_suspend(dev_priv)\n    ...\n```\n\n## `dev_priv` data flow to display suspend\n\nThe actual display function is named `intel_display_driver_suspend`, not `intel_display_suspend`.\n\n```text\ni915_pm_suspend(struct device *kdev)\n{\n    struct drm_i915_private *i915 = kdev_to_i915(kdev);\n    ...\n    return i915_drm_suspend(&i915->drm);\n}\n```\n\nData flow:\n\n```text\nkdev\n  └─ kdev_to_i915(kdev)\n       └─ i915 : struct drm_i915_private *\n\ni915\n  └─ &i915->drm\n       └─ passed as dev to i915_drm_suspend()\n\ni915_drm_suspend(struct drm_device *dev)\n{\n    struct drm_i915_private *dev_priv = to_i915(dev);\n    struct intel_display *display = dev_priv->display;\n\n    intel_display_driver_suspend(display);\n}\n```\n\nExpanded chain:\n\n```text\nkdev\n  → kdev_to_i915(kdev)\n  → i915\n  → &i915->drm\n  → i915_drm_suspend(dev)\n  → to_i915(dev)\n  → dev_priv\n  → dev_priv->display\n  → intel_display_driver_suspend(display)\n```\n\nRelevant source locations:\n\n- `i915_pm_suspend()`: `drivers/gpu/drm/i915/i915_driver.c:1392-1405`\n- `i915_drm_suspend()`: `drivers/gpu/drm/i915/i915_driver.c:1103-1120`\n- `intel_display_driver_suspend()`: `drivers/gpu/drm/i915/display/intel_display_driver.c:684-703`\n\nInside `intel_display_driver_suspend`, the display object supplies the DRM device to the atomic suspend helper:\n\n```c\nstate = drm_atomic_helper_suspend(display->drm);\n```"
+      "content": "**Clarifying driver functions**\n\nI need to address that the user mentioned \"intel_display_suspend,\" but they likely meant \"intel_display_driver_suspend.\" Also, \"from every PCI PM callback\" points to potential callbacks being PM ops. I think I should make a list of callers, but since they don't call i915_pm_runtime_suspend, it’s a dead end. The runtime callback intel_runtime_suspend is separate, and I also need to trace the full call chain reaching i915_pm_suspend. I'll tag appropriate lines and ensure clarity throughout.\n## PCI PM callbacks that reach `i915_pm_suspend`\n\nThe PCI driver installs `i915_pm_ops` through `i915_pci_driver.driver.pm`:\n\n- `drivers/gpu/drm/i915/i915_pci.c:1025-1031`\n- `drivers/gpu/drm/i915/i915_driver.c:1713-1754`\n\nRelevant PM entries:\n\n```c\n.suspend  = i915_pm_suspend,\n.poweroff = i915_pm_suspend,\n```\n\nTherefore, there are two PM dispatch paths reaching the function:\n\n### 1. System suspend\n\n```text\nPCI PM core\n  → i915_pci_driver.driver.pm\n    → i915_pm_ops.suspend\n      → i915_pm_suspend(struct device *kdev)\n        → kdev_to_i915(kdev)\n        → i915_drm_suspend(&i915->drm)\n          → intel_display_driver_suspend(display)\n```\n\nLocations:\n\n- `.suspend = i915_pm_suspend`: `i915_driver.c:1719`\n- `i915_pm_suspend()`: `i915_driver.c:1392-1405`\n- Call to `i915_drm_suspend()`: `i915_driver.c:1404`\n\n### 2. Hibernation image poweroff\n\n```text\nPCI PM core\n  → i915_pci_driver.driver.pm\n    → i915_pm_ops.poweroff\n      → i915_pm_suspend(struct device *kdev)\n        → kdev_to_i915(kdev)\n        → i915_drm_suspend(&i915->drm)\n          → intel_display_driver_suspend(display)\n```\n\nLocation:\n\n- `.poweroff = i915_pm_suspend`: `i915_driver.c:1745`\n\n`.poweroff` is the same function pointer as `.suspend`, so the call chain after PM dispatch is identical.\n\nOther PM callbacks do **not** reach `i915_pm_suspend`:\n\n```text\n.suspend_late    → i915_pm_suspend_late    → i915_drm_suspend_late()\n.suspend_noirq   → i915_pm_suspend_noirq   → i915_drm_suspend_noirq()\n.poweroff_late   → i915_pm_poweroff_late   → i915_drm_suspend_late(..., true)\n.poweroff_noirq  → i915_pm_poweroff_noirq  → i915_drm_suspend_noirq(..., true)\n.freeze          → i915_pm_freeze          → i915_drm_suspend() directly\n.runtime_suspend → intel_runtime_suspend()\n```\n\n## Callers that also call `i915_pm_runtime_suspend`\n\nNone.\n\nThere is no `i915_pm_runtime_suspend` symbol or call in `drivers/gpu/drm/i915`. The runtime PM callback is instead:\n\n```c\n.runtime_suspend = intel_runtime_suspend,\n```\n\nat `i915_driver.c:1752`.\n\nIt is a separate path and does not call `i915_pm_suspend`:\n\n```text\n.runtime_suspend\n  → intel_runtime_suspend(kdev)\n    → i915_gem_runtime_suspend(dev_priv)\n    → intel_pxp_runtime_suspend(...)\n    → intel_gt_runtime_suspend(...)\n    → intel_irq_suspend(dev_priv)\n    ...\n```\n\n## `dev_priv` data flow to display suspend\n\nThe actual display function is named `intel_display_driver_suspend`, not `intel_display_suspend`.\n\n```text\ni915_pm_suspend(struct device *kdev)\n{\n    struct drm_i915_private *i915 = kdev_to_i915(kdev);\n    ...\n    return i915_drm_suspend(&i915->drm);\n}\n```\n\nData flow:\n\n```text\nkdev\n  └─ kdev_to_i915(kdev)\n       └─ i915 : struct drm_i915_private *\n\ni915\n  └─ &i915->drm\n       └─ passed as dev to i915_drm_suspend()\n\ni915_drm_suspend(struct drm_device *dev)\n{\n    struct drm_i915_private *dev_priv = to_i915(dev);\n    struct intel_display *display = dev_priv->display;\n\n    intel_display_driver_suspend(display);\n}\n```\n\nExpanded chain:\n\n```text\nkdev\n  → kdev_to_i915(kdev)\n  → i915\n  → &i915->drm\n  → i915_drm_suspend(dev)\n  → to_i915(dev)\n  → dev_priv\n  → dev_priv->display\n  → intel_display_driver_suspend(display)\n```\n\nRelevant source locations:\n\n- `i915_pm_suspend()`: `drivers/gpu/drm/i915/i915_driver.c:1392-1405`\n- `i915_drm_suspend()`: `drivers/gpu/drm/i915/i915_driver.c:1103-1120`\n- `intel_display_driver_suspend()`: `drivers/gpu/drm/i915/display/intel_display_driver.c:684-703`\n\nInside `intel_display_driver_suspend`, the display object supplies the DRM device to the atomic suspend helper:\n\n```c\nstate = drm_atomic_helper_suspend(display->drm);\n```",
+      "usage": {
+        "input": 3,
+        "output": 1268,
+        "cacheRead": 28944,
+        "cacheWrite": 3325,
+        "reasoning": 223,
+        "totalTokens": 33540,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0007608,
+          "cacheRead": 0.00028944,
+          "cacheWrite": 0.000415625,
+          "total": 0.001466165
+        }
+      }
     }
   ],
   "aggregate": {

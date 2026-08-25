@@ -61,7 +61,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 170,
+        "cacheRead": 0,
+        "cacheWrite": 1134,
+        "reasoning": 19,
+        "totalTokens": 1307,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.000102,
+          "cacheRead": 0,
+          "cacheWrite": 0.00014175,
+          "total": 0.00024405
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -173,7 +188,22 @@
             "context": 4
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 317,
+        "cacheRead": 1134,
+        "cacheWrite": 10381,
+        "reasoning": 47,
+        "totalTokens": 11835,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001902,
+          "cacheRead": 1.134e-05,
+          "cacheWrite": 0.001297625,
+          "total": 0.001499465
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -311,7 +341,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 479,
+        "cacheRead": 11515,
+        "cacheWrite": 21036,
+        "reasoning": 209,
+        "totalTokens": 33033,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0002874,
+          "cacheRead": 0.00011515000000000001,
+          "cacheWrite": 0.0026295,
+          "total": 0.00303235
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -429,7 +474,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 249,
+        "cacheRead": 32551,
+        "cacheWrite": 31736,
+        "reasoning": 39,
+        "totalTokens": 64539,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001494,
+          "cacheRead": 0.00032551,
+          "cacheWrite": 0.003967,
+          "total": 0.00444221
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -516,7 +576,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 255,
+        "cacheRead": 64287,
+        "cacheWrite": 19573,
+        "reasoning": 80,
+        "totalTokens": 84118,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.000153,
+          "cacheRead": 0.00064287,
+          "cacheWrite": 0.002446625,
+          "total": 0.003242795
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -571,7 +646,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 133,
+        "cacheRead": 83860,
+        "cacheWrite": 41969,
+        "reasoning": 60,
+        "totalTokens": 125965,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 7.98e-05,
+          "cacheRead": 0.0008386,
+          "cacheWrite": 0.005246125,
+          "total": 0.006164825
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -604,7 +694,22 @@
             "limit": 100
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 123,
+        "cacheRead": 125829,
+        "cacheWrite": 14153,
+        "reasoning": 39,
+        "totalTokens": 140108,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 7.379999999999999e-05,
+          "cacheRead": 0.00125829,
+          "cacheWrite": 0.001769125,
+          "total": 0.003101515
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -658,7 +763,22 @@
             "limit": 50
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 250,
+        "cacheRead": 139982,
+        "cacheWrite": 16316,
+        "reasoning": 94,
+        "totalTokens": 156551,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00015,
+          "cacheRead": 0.00139982,
+          "cacheWrite": 0.0020395,
+          "total": 0.00358962
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -700,7 +820,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "## Finding\n\nThe warning is caused by a **Type‑C partner/device sysfs-link teardown race in `drivers/usb/typec/class.c`**, not by a kernfs failure or a Dell-specific UCSI protocol error.\n\nThe supplied tree still contains the offending implementation. The relevant path is:\n\n```text\nucsi_handle_connector_change()\n  -> ucsi_unregister_partner()\n     -> typec_unregister_partner()\n        -> typec_partner_unlink_device()\n           -> sysfs_remove_link(&dev->kobj, \"typec\")\n              -> kernfs_remove_by_name_ns()\n```\n\n### 1. UCSI initiates partner removal\n\n`drivers/usb/typec/ucsi/ucsi.c:1264` contains `ucsi_handle_connector_change()`. On a connector-change event for a disconnected connector, it executes:\n\n```c\n} else {\n        ucsi_unregister_partner(con);\n}\n```\n\nThe call is at `drivers/usb/typec/ucsi/ucsi.c:1325`.\n\n`ucsi_unregister_partner()` is at `drivers/usb/typec/ucsi/ucsi.c:1138-1154`:\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n        if (!con->partner)\n                return;\n\n        typec_set_mode(con->port, TYPEC_STATE_SAFE);\n        ...\n        typec_unregister_partner(con->partner);\n        memset(&con->partner_identity, 0, sizeof(con->partner_identity));\n        con->partner = NULL;\n}\n```\n\nThe actual call to the Type‑C class is at line **1151**.\n\n### 2. `typec_unregister_partner()` removes USB links\n\n`drivers/usb/typec/class.c:1174-1196` implements `typec_unregister_partner()`:\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n        ...\n        mutex_lock(&port->partner_link_lock);\n        if (port->usb2_dev) {\n                typec_partner_unlink_device(partner, port->usb2_dev);\n                port->usb2_dev = NULL;\n        }\n        if (port->usb3_dev) {\n                typec_partner_unlink_device(partner, port->usb3_dev);\n                port->usb3_dev = NULL;\n        }\n\n        device_unregister(&partner->dev);\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThe two relevant calls are at **class.c:1185** and **class.c:1189**.\n\n### 3. The immediate offending function\n\n`typec_partner_unlink_device()` is at `drivers/usb/typec/class.c:906-913`:\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n                                        struct device *dev)\n{\n        sysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n        sysfs_remove_link(&dev->kobj, \"typec\");\n\n        if (partner->deattach)\n                partner->deattach(partner, dev);\n}\n```\n\nThe warning-producing operation is:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nat **class.c:909**.\n\nThe reverse `typec` link is created at **class.c:888**:\n\n```c\nret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n```\n\nThus the link being removed is the USB device's `typec` symlink pointing back to the Type‑C partner.\n\n## Why the warning says “no directory”\n\n`sysfs_remove_link()` eventually calls `kernfs_remove_by_name_ns()` with the source kobject's kernfs directory.\n\n`fs/kernfs/dir.c:1724-1752` contains:\n\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n                             const struct ns_common *ns)\n{\n        ...\n        if (!parent) {\n                WARN(1, KERN_WARNING\n                     \"kernfs: can not remove '%s', no directory\\n\",\n                     name);\n                return -ENOENT;\n        }\n        ...\n}\n```\n\nTherefore the exact meaning of:\n\n```text\nkernfs: can not remove 'typec', no directory\n```\n\nis that the `parent` kernfs node is `NULL`. In this path, the USB device's `dev->kobj.sd` has already been removed during USB device teardown. The code still attempts to remove the Type‑C symlink using the now-unregistered USB device kobject:\n\n```text\ndev->kobj.sd == NULL\n -> sysfs_remove_link(&dev->kobj, \"typec\")\n -> kernfs_remove_by_name_ns(NULL, \"typec\", ...)\n -> -ENOENT and WARN()\n```\n\nThis is distinct from merely finding that a `typec` entry is absent. The warning is specifically emitted by the `!parent` check.\n\n## The second problem: recursive/unordered detach handling\n\nThe Type‑C port installs its USB-device detach callback at:\n\n```text\ndrivers/usb/typec/class.c:2753\n```\n\n```c\nport->con.deattach = typec_partner_deattach;\n```\n\n`typec_partner_deattach()` is at `drivers/usb/typec/class.c:2169-2186`:\n\n```c\nstatic void typec_partner_deattach(struct typec_connector *con,\n                                   struct device *dev)\n{\n        struct typec_port *port = container_of(con, struct typec_port, con);\n        struct typec_partner *partner;\n\n        mutex_lock(&port->partner_link_lock);\n        partner = typec_get_partner(port);\n        if (partner) {\n                typec_partner_unlink_device(partner, dev);\n                put_device(&partner->dev);\n        }\n\n        if (port->usb2_dev == dev)\n                port->usb2_dev = NULL;\n        else if (port->usb3_dev == dev)\n                port->usb3_dev = NULL;\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThe problematic call is **class.c:2177**.\n\n`typec_partner_unlink_device()` itself invokes `partner->deattach()` at **class.c:911-912**. Consequently, the class unlink routine calls the detach callback, and the detach callback calls the class unlink routine again:\n\n```text\ntypec_partner_unlink_device()\n  -> partner->deattach()\n     -> typec_partner_deattach()\n        -> typec_partner_unlink_device()\n```\n\nThis creates recursive/double unlink behavior and also leaves the implementation vulnerable to the USB device kobject being torn down before the Type‑C side attempts to remove its reverse link.\n\nThe callback interface is defined in `include/linux/usb/typec.h:399-414`, with `typec_deattach()` dispatching the connector callback at lines **410-413**.\n\n## Is the fix in this tree?\n\nNo.\n\nThe tree still has all of the identifying old code:\n\n- `typec_partner_unlink_device()` removes `dev->kobj`'s `typec` link and then calls `partner->deattach()` — `drivers/usb/typec/class.c:906-913`.\n- `typec_partner_deattach()` calls `typec_partner_unlink_device()` — `class.c:2169-2179`.\n- The callback is installed as `port->con.deattach` — `class.c:2753`.\n- There is no `device_is_registered()` guard or equivalent protection in the Type‑C code; a grep of `drivers/usb/typec` finds no such guard.\n\n## Upstream fix\n\nAn upstream Type‑C class/sysfs teardown fix exists as a **series**, rather than a UCSI-only fix. Its essential changes are:\n\n1. Break the recursive `typec_partner_unlink_device()` / `typec_partner_deattach()` relationship.\n2. Make the class own removal of the partner/device links.\n3. Use target-aware sysfs link removal (`sysfs_delete_link()`) where necessary, so link deletion can still be performed safely when the link target is being removed.\n4. Avoid attempting to remove a link through a kobject whose kernfs directory has already disappeared.\n\nThis tree does contain the target-aware helper in `fs/sysfs/symlink.c:113-136`:\n\n```c\nvoid sysfs_delete_link(struct kobject *kobj, struct kobject *targ,\n                       const char *name)\n```\n\nIts comment explicitly says at lines **118-119** that, unlike `sysfs_remove_link()`, it has enough information to delete links in this teardown situation. However, `drivers/usb/typec/class.c` does not use it; grep finds no `sysfs_delete_link` there.\n\nSo the practical conclusion is:\n\n> The 6.17-based source used for this OEM kernel predates the upstream Type‑C partner-link teardown fix series. Updating to an Ubuntu kernel containing that series, or backporting the corresponding Type‑C class changes, should remove this warning. The warning is harmless at the kernfs level—the operation returns `-ENOENT`—but it exposes a real ordering/ownership bug in Type‑C sysfs-link teardown."
+      "content": "## Finding\n\nThe warning is caused by a **Type‑C partner/device sysfs-link teardown race in `drivers/usb/typec/class.c`**, not by a kernfs failure or a Dell-specific UCSI protocol error.\n\nThe supplied tree still contains the offending implementation. The relevant path is:\n\n```text\nucsi_handle_connector_change()\n  -> ucsi_unregister_partner()\n     -> typec_unregister_partner()\n        -> typec_partner_unlink_device()\n           -> sysfs_remove_link(&dev->kobj, \"typec\")\n              -> kernfs_remove_by_name_ns()\n```\n\n### 1. UCSI initiates partner removal\n\n`drivers/usb/typec/ucsi/ucsi.c:1264` contains `ucsi_handle_connector_change()`. On a connector-change event for a disconnected connector, it executes:\n\n```c\n} else {\n        ucsi_unregister_partner(con);\n}\n```\n\nThe call is at `drivers/usb/typec/ucsi/ucsi.c:1325`.\n\n`ucsi_unregister_partner()` is at `drivers/usb/typec/ucsi/ucsi.c:1138-1154`:\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n        if (!con->partner)\n                return;\n\n        typec_set_mode(con->port, TYPEC_STATE_SAFE);\n        ...\n        typec_unregister_partner(con->partner);\n        memset(&con->partner_identity, 0, sizeof(con->partner_identity));\n        con->partner = NULL;\n}\n```\n\nThe actual call to the Type‑C class is at line **1151**.\n\n### 2. `typec_unregister_partner()` removes USB links\n\n`drivers/usb/typec/class.c:1174-1196` implements `typec_unregister_partner()`:\n\n```c\nvoid typec_unregister_partner(struct typec_partner *partner)\n{\n        ...\n        mutex_lock(&port->partner_link_lock);\n        if (port->usb2_dev) {\n                typec_partner_unlink_device(partner, port->usb2_dev);\n                port->usb2_dev = NULL;\n        }\n        if (port->usb3_dev) {\n                typec_partner_unlink_device(partner, port->usb3_dev);\n                port->usb3_dev = NULL;\n        }\n\n        device_unregister(&partner->dev);\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThe two relevant calls are at **class.c:1185** and **class.c:1189**.\n\n### 3. The immediate offending function\n\n`typec_partner_unlink_device()` is at `drivers/usb/typec/class.c:906-913`:\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n                                        struct device *dev)\n{\n        sysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n        sysfs_remove_link(&dev->kobj, \"typec\");\n\n        if (partner->deattach)\n                partner->deattach(partner, dev);\n}\n```\n\nThe warning-producing operation is:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nat **class.c:909**.\n\nThe reverse `typec` link is created at **class.c:888**:\n\n```c\nret = sysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n```\n\nThus the link being removed is the USB device's `typec` symlink pointing back to the Type‑C partner.\n\n## Why the warning says “no directory”\n\n`sysfs_remove_link()` eventually calls `kernfs_remove_by_name_ns()` with the source kobject's kernfs directory.\n\n`fs/kernfs/dir.c:1724-1752` contains:\n\n```c\nint kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,\n                             const struct ns_common *ns)\n{\n        ...\n        if (!parent) {\n                WARN(1, KERN_WARNING\n                     \"kernfs: can not remove '%s', no directory\\n\",\n                     name);\n                return -ENOENT;\n        }\n        ...\n}\n```\n\nTherefore the exact meaning of:\n\n```text\nkernfs: can not remove 'typec', no directory\n```\n\nis that the `parent` kernfs node is `NULL`. In this path, the USB device's `dev->kobj.sd` has already been removed during USB device teardown. The code still attempts to remove the Type‑C symlink using the now-unregistered USB device kobject:\n\n```text\ndev->kobj.sd == NULL\n -> sysfs_remove_link(&dev->kobj, \"typec\")\n -> kernfs_remove_by_name_ns(NULL, \"typec\", ...)\n -> -ENOENT and WARN()\n```\n\nThis is distinct from merely finding that a `typec` entry is absent. The warning is specifically emitted by the `!parent` check.\n\n## The second problem: recursive/unordered detach handling\n\nThe Type‑C port installs its USB-device detach callback at:\n\n```text\ndrivers/usb/typec/class.c:2753\n```\n\n```c\nport->con.deattach = typec_partner_deattach;\n```\n\n`typec_partner_deattach()` is at `drivers/usb/typec/class.c:2169-2186`:\n\n```c\nstatic void typec_partner_deattach(struct typec_connector *con,\n                                   struct device *dev)\n{\n        struct typec_port *port = container_of(con, struct typec_port, con);\n        struct typec_partner *partner;\n\n        mutex_lock(&port->partner_link_lock);\n        partner = typec_get_partner(port);\n        if (partner) {\n                typec_partner_unlink_device(partner, dev);\n                put_device(&partner->dev);\n        }\n\n        if (port->usb2_dev == dev)\n                port->usb2_dev = NULL;\n        else if (port->usb3_dev == dev)\n                port->usb3_dev = NULL;\n        mutex_unlock(&port->partner_link_lock);\n}\n```\n\nThe problematic call is **class.c:2177**.\n\n`typec_partner_unlink_device()` itself invokes `partner->deattach()` at **class.c:911-912**. Consequently, the class unlink routine calls the detach callback, and the detach callback calls the class unlink routine again:\n\n```text\ntypec_partner_unlink_device()\n  -> partner->deattach()\n     -> typec_partner_deattach()\n        -> typec_partner_unlink_device()\n```\n\nThis creates recursive/double unlink behavior and also leaves the implementation vulnerable to the USB device kobject being torn down before the Type‑C side attempts to remove its reverse link.\n\nThe callback interface is defined in `include/linux/usb/typec.h:399-414`, with `typec_deattach()` dispatching the connector callback at lines **410-413**.\n\n## Is the fix in this tree?\n\nNo.\n\nThe tree still has all of the identifying old code:\n\n- `typec_partner_unlink_device()` removes `dev->kobj`'s `typec` link and then calls `partner->deattach()` — `drivers/usb/typec/class.c:906-913`.\n- `typec_partner_deattach()` calls `typec_partner_unlink_device()` — `class.c:2169-2179`.\n- The callback is installed as `port->con.deattach` — `class.c:2753`.\n- There is no `device_is_registered()` guard or equivalent protection in the Type‑C code; a grep of `drivers/usb/typec` finds no such guard.\n\n## Upstream fix\n\nAn upstream Type‑C class/sysfs teardown fix exists as a **series**, rather than a UCSI-only fix. Its essential changes are:\n\n1. Break the recursive `typec_partner_unlink_device()` / `typec_partner_deattach()` relationship.\n2. Make the class own removal of the partner/device links.\n3. Use target-aware sysfs link removal (`sysfs_delete_link()`) where necessary, so link deletion can still be performed safely when the link target is being removed.\n4. Avoid attempting to remove a link through a kobject whose kernfs directory has already disappeared.\n\nThis tree does contain the target-aware helper in `fs/sysfs/symlink.c:113-136`:\n\n```c\nvoid sysfs_delete_link(struct kobject *kobj, struct kobject *targ,\n                       const char *name)\n```\n\nIts comment explicitly says at lines **118-119** that, unlike `sysfs_remove_link()`, it has enough information to delete links in this teardown situation. However, `drivers/usb/typec/class.c` does not use it; grep finds no `sysfs_delete_link` there.\n\nSo the practical conclusion is:\n\n> The 6.17-based source used for this OEM kernel predates the upstream Type‑C partner-link teardown fix series. Updating to an Ubuntu kernel containing that series, or backporting the corresponding Type‑C class changes, should remove this warning. The warning is harmless at the kernfs level—the operation returns `-ENOENT`—but it exposes a real ordering/ownership bug in Type‑C sysfs-link teardown.",
+      "usage": {
+        "input": 3,
+        "output": 1909,
+        "cacheRead": 156298,
+        "cacheWrite": 2369,
+        "reasoning": 0,
+        "totalTokens": 160579,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0011454,
+          "cacheRead": 0.00156298,
+          "cacheWrite": 0.000296125,
+          "total": 0.0030048049999999997
+        }
+      }
     }
   ],
   "aggregate": {

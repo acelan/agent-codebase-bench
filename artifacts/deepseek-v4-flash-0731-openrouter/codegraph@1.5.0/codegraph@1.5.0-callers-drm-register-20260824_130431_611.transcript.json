@@ -36,7 +36,22 @@
             "query": "pm_runtime_get_sync callers"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 778,
+        "output": 168,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 54,
+        "totalTokens": 946,
+        "cost": {
+          "input": 7.002e-05,
+          "output": 3.024e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.00010025999999999999
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -83,7 +98,22 @@
             "query": "pm_runtime_get_sync callers in drivers/gpu/drm/i915"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 15951,
+        "output": 360,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 251,
+        "totalTokens": 16311,
+        "cost": {
+          "input": 0.00143559,
+          "output": 6.48e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.00150039
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -130,7 +160,22 @@
             "query": "i915 pm_runtime_get_sync"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 11423,
+        "output": 671,
+        "cacheRead": 16128,
+        "cacheWrite": 0,
+        "reasoning": 563,
+        "totalTokens": 28222,
+        "cost": {
+          "input": 0.00102807,
+          "output": 0.00012077999999999999,
+          "cacheRead": 0.00029030399999999996,
+          "cacheWrite": 0,
+          "total": 0.001439154
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -177,7 +222,22 @@
             "query": "i915_probe drm_dev_register"
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 12504,
+        "output": 1246,
+        "cacheRead": 27904,
+        "cacheWrite": 0,
+        "reasoning": 1100,
+        "totalTokens": 41654,
+        "cost": {
+          "input": 0.00112536,
+          "output": 0.00022428,
+          "cacheRead": 0.000502272,
+          "cacheWrite": 0,
+          "total": 0.001851912
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -208,7 +268,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "The codegraph tool is frustrating. It's doing a symbol search and returning the top \"symbols\" but not giving the precise scoped call-graph I need. It keeps returning identical generic info about drm_dev_register and pm_runtime_get_sync plus unrelated struct noise (ktime_t extends, etc).\n\nThe tool essentially returns the same \"blast radius\" for these global symbols regardless of my query's scope. It's not doing the callback scoping I need. It also doesn't enumerate the 100+ callers of drm_dev_register or 1125 callers of pm_runtime_get_sync.\n\nKey observations from the codegraph results:\n1. drm_dev_register has 101 (actually says 101 in one, \"101 callers\") / \"1125 callers\" etc. The listings given show non-i915 files: accel/amxdna, ethosu, habanalabs, ivpu... none are i915. i-v-d-r is ivpu which is accel, not i915.\n\nImportant: This codebase seems to have the \"i915\" driver largely rewritten into the \"Xe\" DRM driver (drivers/gpu/drm/xe). The actual drm driver registration in i915 path... Let me reconsider.\n\nActually let me reconsider the architecture. In this codebase, `i915_init` module init dynamically calls through `init_funcs.init` fn pointers: xe_check_nomodeset, xe_configfs_init, xe_hw_fence_module_init, xe_sched_job_module_init, xe_register_pci_driver, xe_observation_sysctl_register. So the i915 driver delegates to the \"xe\" (Xe) driver. There is no direct call of drm_dev_register within i915 itself; rather the registration happens through the Xe / base layers.\n\nSo it's plausible that within drivers/gpu/drm/i915 there are NO functions that directly call drm_dev_register or pm_runtime_get_sync. The i915 code delegates to xe_* functions. The pm_runtime_get_sync callers found (blk_crypto_hw_enter, ivpu_ms_cleanup, etc.) are in other sub-systems, not i915.\n\nThe codegraph's \"Found 49 symbols across 4 files\" for pm_runtime_get_sync associated some i915 files (i915_perf_types.h, i915_active_types.h, etc.) but those are struct definitions with ktime_t extends, i.e., irrelevant to the query—the fuzzy matcher matched \"i915\" in the query and returned i915 struct files.\n\nGiven the tool limitations, I should honestly report what I can conclude:\n\n1. The codegraph tool does not provide a clean scoped reverse call-graph query; it does fuzzy symbol search across the whole codebase, and its callers list truncates/noise.\n\n2. From the data it did surface:\n   - drm_dev_register: 101 callers total across the codebase; the enumerated reveal files are iv accel/ethosu/habanalabs/ivpu etc., NOT i915. The obvious i915-relevant wires are dynamic through fn-pointers (drm_driver.load → fsl_dcu_load / fsl_dcu_unload / radeon_driver_unload_kms — none i915).\n   - i915 module init i915_init → dynamic init funcs → xe_* (Xe) sub-drivers. So i915 itself does not directly call drm_dev_register, it's handled via the Xe/DXC driver path.\n   - pm_runtime_get_sync: 1125 callers total; the enumerated residing in block/, ivpu, rocket, amb,a... none in i915. So no direct i915 callers surfaced.\n\nI should report honestly rather than fabricate a list. I cannot fabricate i915 functions that call these. I must be transparent that the query didn't reveal i915-specific direct callers, and explain the architecture (i915 delegates to xe).\n\nAlso the user asked to \"Report any call cycle.\" Without being able to compute a precise call graph, I cannot substantiate a cycle. I can note the drm_dev_register → driver->load → ... dynamic path.\n\nLet me be honest and precise about limitations and give the best-effort findings. I should not invent callers.\n\nLet me give a final summary. I'll be transparent that codegraph did fuzzy whole-repo matching and did not cleanly isolate i915-local direct callers, so I can't fabricate that list. I'll report what it actually surfaced.\n\nI think the right move is to report honestly. Let me write up the answer.\nI've done several codegraph queries. I need to be honest with you about a limitation before presenting findings.\n\n## Tooling limitation\n\nThe `codegraph` tool in this harness does **fuzzy whole-codebase symbol matching**, not a cleanly scoped \"reverse callers within a directory\" query. My attempts to scope to `drivers/gpu/drm/i915` (e.g. `\"drm_dev_register callers in drivers/gpu/drm/i915\"`, `\"i915 pm_runtime_get_sync\"`) still returned the **same global symbol** (the top-level `pm_runtime_get_sync` / `drm_dev_register` definition and its whole-repo blast radius), plus unrelated i915 symbols that merely matched the `i915` token (structs like `i915_perf`, `i915_active`, `i915_pmu`, `i915_params`, `i915_vma`) that do **not** call these functions. It did **not** enumerate the full caller list — `drm_dev_register` claims 101 callers and `pm_runtime_get_sync` claims 1125, but the tool only ever shows a partial, non-i915 sample (IVPU, Habanabased, amdxana, blk crypto, ahci/sata, etc.) before truncating.\n\nI will **not fabricate** an i915-local caller list, because the tool did not surface i915-specific call sites and I cannot verify them from these results.\n\n## What the queries actually established\n\n**`drm_dev_register` (drivers/gpu/drm/drm_drv.c:1056)**\n- 101 direct callers repo-wide; the ones surfaced by codegraph (amdxdna, ethuso, habanabs, ivpu, blk, ahci, sata) are **outside** `drivers/gpu/drm/i915`.\n- The only dynamic (fn-pointer) wiring identified is through `drm_driver.load/unload` — dispatching to non-i915 drivers (`fsl_dcu_load/unload`, `radeon_driver_unload_kms`).\n- **Notably:** the i915 module init path (`i915_init` in `drivers/gpu/drm/i915/i915_module.c:87`) dispatches its sub-initializers through a fn-pointer table (`init_funcs.init`) to `xe_check_nomodeset`, `xe_configfs_init`, `xe_hw_fence_module_init`, `xe_sched_job_module_init`, `xe_register_pci_driver`, `xe_observation_sysctl_register`. This strongly suggests DRM device registration for i915 is **delegated to the Xe sub-system** rather than called directly from an `i915_*` function. Codegraph did not produce a confirmed direct `i915 → drm_dev_register` edge.\n\n**`pm_runtime_get_sync` (include/linux/pm_runtime.h:511)**\n- `static inline` → calls `__pm_runtime_resume(dev, RPM_GET_PUT)`.\n- 1125 callers repo-wide; every caller the tool named (blk-cryo, gw, sah, aix, sata, IVPU, etc.) is **outside** `drivers/gpu/drm/i915`. No direct `drivers/gpu/drm/i915` caller was surfaced or verified.\n\n## Call-cycle analysis\n\nI **cannot appraise call cycles** because codegraph did not return the complete i915-scoped call graph I'd need to traverse (the truncation and fuzzy matching prevent a sound cycle-finding pass over the full edge set). The one interesting indirect edge to flag — which could participate in a cycle if you follow it — is:\n\n- `drm_dev_register` → `drm_driver.load` (fn-pointer, drm_drv.c:1093) → dispatches to driver-specific `*_load` functions.\n- Those `*_load` functions can in principle call back into DRM registration/lookup (e.g. `drm_dev_*` internals), but codegraph's results didn't give me verified i915 edges, so I won't claim a concrete cycle exists.\n\n## Bottom line\n\nTo give you the precise \"functions in `drivers/gpu/drm/i915` that directly call `drm_dev_register` or `pm_runtime_get_sync`\", plus their one-hop-up callers and any cycle, the codegraph query tool here cannot reliably produce a scoped call graph. I'd recommend either:\n1. a proper reverse-callers query over the codegraph index, or\n2. a targeted grep/read pass over `drivers/gpu/drm/i915` (and its delegated `xe_*`/`intel_*`/`xe/i915` files) for those two symbols.\n\nHappy to run that if you have/grant a file-grep or read capability; with the current toolset alone I'd be guessing, and I won't do that."
+      "content": "The codegraph tool is frustrating. It's doing a symbol search and returning the top \"symbols\" but not giving the precise scoped call-graph I need. It keeps returning identical generic info about drm_dev_register and pm_runtime_get_sync plus unrelated struct noise (ktime_t extends, etc).\n\nThe tool essentially returns the same \"blast radius\" for these global symbols regardless of my query's scope. It's not doing the callback scoping I need. It also doesn't enumerate the 100+ callers of drm_dev_register or 1125 callers of pm_runtime_get_sync.\n\nKey observations from the codegraph results:\n1. drm_dev_register has 101 (actually says 101 in one, \"101 callers\") / \"1125 callers\" etc. The listings given show non-i915 files: accel/amxdna, ethosu, habanalabs, ivpu... none are i915. i-v-d-r is ivpu which is accel, not i915.\n\nImportant: This codebase seems to have the \"i915\" driver largely rewritten into the \"Xe\" DRM driver (drivers/gpu/drm/xe). The actual drm driver registration in i915 path... Let me reconsider.\n\nActually let me reconsider the architecture. In this codebase, `i915_init` module init dynamically calls through `init_funcs.init` fn pointers: xe_check_nomodeset, xe_configfs_init, xe_hw_fence_module_init, xe_sched_job_module_init, xe_register_pci_driver, xe_observation_sysctl_register. So the i915 driver delegates to the \"xe\" (Xe) driver. There is no direct call of drm_dev_register within i915 itself; rather the registration happens through the Xe / base layers.\n\nSo it's plausible that within drivers/gpu/drm/i915 there are NO functions that directly call drm_dev_register or pm_runtime_get_sync. The i915 code delegates to xe_* functions. The pm_runtime_get_sync callers found (blk_crypto_hw_enter, ivpu_ms_cleanup, etc.) are in other sub-systems, not i915.\n\nThe codegraph's \"Found 49 symbols across 4 files\" for pm_runtime_get_sync associated some i915 files (i915_perf_types.h, i915_active_types.h, etc.) but those are struct definitions with ktime_t extends, i.e., irrelevant to the query—the fuzzy matcher matched \"i915\" in the query and returned i915 struct files.\n\nGiven the tool limitations, I should honestly report what I can conclude:\n\n1. The codegraph tool does not provide a clean scoped reverse call-graph query; it does fuzzy symbol search across the whole codebase, and its callers list truncates/noise.\n\n2. From the data it did surface:\n   - drm_dev_register: 101 callers total across the codebase; the enumerated reveal files are iv accel/ethosu/habanalabs/ivpu etc., NOT i915. The obvious i915-relevant wires are dynamic through fn-pointers (drm_driver.load → fsl_dcu_load / fsl_dcu_unload / radeon_driver_unload_kms — none i915).\n   - i915 module init i915_init → dynamic init funcs → xe_* (Xe) sub-drivers. So i915 itself does not directly call drm_dev_register, it's handled via the Xe/DXC driver path.\n   - pm_runtime_get_sync: 1125 callers total; the enumerated residing in block/, ivpu, rocket, amb,a... none in i915. So no direct i915 callers surfaced.\n\nI should report honestly rather than fabricate a list. I cannot fabricate i915 functions that call these. I must be transparent that the query didn't reveal i915-specific direct callers, and explain the architecture (i915 delegates to xe).\n\nAlso the user asked to \"Report any call cycle.\" Without being able to compute a precise call graph, I cannot substantiate a cycle. I can note the drm_dev_register → driver->load → ... dynamic path.\n\nLet me be honest and precise about limitations and give the best-effort findings. I should not invent callers.\n\nLet me give a final summary. I'll be transparent that codegraph did fuzzy whole-repo matching and did not cleanly isolate i915-local direct callers, so I can't fabricate that list. I'll report what it actually surfaced.\n\nI think the right move is to report honestly. Let me write up the answer.\nI've done several codegraph queries. I need to be honest with you about a limitation before presenting findings.\n\n## Tooling limitation\n\nThe `codegraph` tool in this harness does **fuzzy whole-codebase symbol matching**, not a cleanly scoped \"reverse callers within a directory\" query. My attempts to scope to `drivers/gpu/drm/i915` (e.g. `\"drm_dev_register callers in drivers/gpu/drm/i915\"`, `\"i915 pm_runtime_get_sync\"`) still returned the **same global symbol** (the top-level `pm_runtime_get_sync` / `drm_dev_register` definition and its whole-repo blast radius), plus unrelated i915 symbols that merely matched the `i915` token (structs like `i915_perf`, `i915_active`, `i915_pmu`, `i915_params`, `i915_vma`) that do **not** call these functions. It did **not** enumerate the full caller list — `drm_dev_register` claims 101 callers and `pm_runtime_get_sync` claims 1125, but the tool only ever shows a partial, non-i915 sample (IVPU, Habanabased, amdxana, blk crypto, ahci/sata, etc.) before truncating.\n\nI will **not fabricate** an i915-local caller list, because the tool did not surface i915-specific call sites and I cannot verify them from these results.\n\n## What the queries actually established\n\n**`drm_dev_register` (drivers/gpu/drm/drm_drv.c:1056)**\n- 101 direct callers repo-wide; the ones surfaced by codegraph (amdxdna, ethuso, habanabs, ivpu, blk, ahci, sata) are **outside** `drivers/gpu/drm/i915`.\n- The only dynamic (fn-pointer) wiring identified is through `drm_driver.load/unload` — dispatching to non-i915 drivers (`fsl_dcu_load/unload`, `radeon_driver_unload_kms`).\n- **Notably:** the i915 module init path (`i915_init` in `drivers/gpu/drm/i915/i915_module.c:87`) dispatches its sub-initializers through a fn-pointer table (`init_funcs.init`) to `xe_check_nomodeset`, `xe_configfs_init`, `xe_hw_fence_module_init`, `xe_sched_job_module_init`, `xe_register_pci_driver`, `xe_observation_sysctl_register`. This strongly suggests DRM device registration for i915 is **delegated to the Xe sub-system** rather than called directly from an `i915_*` function. Codegraph did not produce a confirmed direct `i915 → drm_dev_register` edge.\n\n**`pm_runtime_get_sync` (include/linux/pm_runtime.h:511)**\n- `static inline` → calls `__pm_runtime_resume(dev, RPM_GET_PUT)`.\n- 1125 callers repo-wide; every caller the tool named (blk-cryo, gw, sah, aix, sata, IVPU, etc.) is **outside** `drivers/gpu/drm/i915`. No direct `drivers/gpu/drm/i915` caller was surfaced or verified.\n\n## Call-cycle analysis\n\nI **cannot appraise call cycles** because codegraph did not return the complete i915-scoped call graph I'd need to traverse (the truncation and fuzzy matching prevent a sound cycle-finding pass over the full edge set). The one interesting indirect edge to flag — which could participate in a cycle if you follow it — is:\n\n- `drm_dev_register` → `drm_driver.load` (fn-pointer, drm_drv.c:1093) → dispatches to driver-specific `*_load` functions.\n- Those `*_load` functions can in principle call back into DRM registration/lookup (e.g. `drm_dev_*` internals), but codegraph's results didn't give me verified i915 edges, so I won't claim a concrete cycle exists.\n\n## Bottom line\n\nTo give you the precise \"functions in `drivers/gpu/drm/i915` that directly call `drm_dev_register` or `pm_runtime_get_sync`\", plus their one-hop-up callers and any cycle, the codegraph query tool here cannot reliably produce a scoped call graph. I'd recommend either:\n1. a proper reverse-callers query over the codegraph index, or\n2. a targeted grep/read pass over `drivers/gpu/drm/i915` (and its delegated `xe_*`/`intel_*`/`xe/i915` files) for those two symbols.\n\nHappy to run that if you have/grant a file-grep or read capability; with the current toolset alone I'd be guessing, and I won't do that.",
+      "usage": {
+        "input": 12659,
+        "output": 2054,
+        "cacheRead": 41472,
+        "cacheWrite": 0,
+        "reasoning": 976,
+        "totalTokens": 56185,
+        "cost": {
+          "input": 0.00113931,
+          "output": 0.00036972,
+          "cacheRead": 0.0007464959999999999,
+          "cacheWrite": 0,
+          "total": 0.002255526
+        }
+      }
     }
   ],
   "aggregate": {

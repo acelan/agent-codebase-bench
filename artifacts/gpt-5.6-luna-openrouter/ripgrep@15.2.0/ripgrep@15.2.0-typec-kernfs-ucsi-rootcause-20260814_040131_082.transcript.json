@@ -46,7 +46,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 161,
+        "cacheRead": 1455,
+        "cacheWrite": 0,
+        "reasoning": 22,
+        "totalTokens": 1619,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 9.659999999999999e-05,
+          "cacheRead": 1.455e-05,
+          "cacheWrite": 0,
+          "total": 0.00011144999999999998
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -152,7 +167,22 @@
             "limit": 45
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 288,
+        "cacheRead": 1455,
+        "cacheWrite": 18647,
+        "reasoning": 30,
+        "totalTokens": 20393,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001728,
+          "cacheRead": 1.455e-05,
+          "cacheWrite": 0.002330875,
+          "total": 0.002518525
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -264,7 +294,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 272,
+        "cacheRead": 20102,
+        "cacheWrite": 2610,
+        "reasoning": 59,
+        "totalTokens": 22987,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00016319999999999998,
+          "cacheRead": 0.00020102,
+          "cacheWrite": 0.00032625,
+          "total": 0.0006907700000000001
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -340,7 +385,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 292,
+        "cacheRead": 22712,
+        "cacheWrite": 11720,
+        "reasoning": 38,
+        "totalTokens": 34727,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0001752,
+          "cacheRead": 0.00022712,
+          "cacheWrite": 0.001465,
+          "total": 0.00186762
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -438,7 +498,22 @@
             "timeout": 20
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 414,
+        "cacheRead": 34432,
+        "cacheWrite": 27658,
+        "reasoning": 171,
+        "totalTokens": 62507,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00024839999999999997,
+          "cacheRead": 0.00034432,
+          "cacheWrite": 0.00345725,
+          "total": 0.00405027
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -512,7 +587,22 @@
             "timeout": 30
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 218,
+        "cacheRead": 62090,
+        "cacheWrite": 1868,
+        "reasoning": 91,
+        "totalTokens": 64179,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00013079999999999998,
+          "cacheRead": 0.0006209,
+          "cacheWrite": 0.0002335,
+          "total": 0.0009855
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -569,7 +659,22 @@
             "timeout": 30
           }
         }
-      ]
+      ],
+      "usage": {
+        "input": 3,
+        "output": 337,
+        "cacheRead": 63958,
+        "cacheWrite": 272,
+        "reasoning": 68,
+        "totalTokens": 64570,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.00020219999999999998,
+          "cacheRead": 0.00063958,
+          "cacheWrite": 3.4e-05,
+          "total": 0.00087608
+        }
+      }
     },
     {
       "type": "tool_result",
@@ -622,7 +727,22 @@
       "token_count": null,
       "finish_reason": "stop",
       "type": "final_answer",
-      "content": "## Conclusion\n\nThe warning is caused by a **USB Type-C connector teardown race**, not by a UCSI protocol error or a Dell-specific firmware-created missing directory.\n\nThe stale state is created in `drivers/usb/core/port.c::connector_unbind()`: it clears `port_dev->connector` without first calling `typec_deattach()`. Consequently, the Type-C class retains `port->usb2_dev`/`port->usb3_dev` after the USB device's sysfs kobject has begun teardown. Later, UCSI unregisters the partner and tries to remove the already-detached device-side `typec` symlink.\n\nThe upstream fix exists, but it is **not present in this tree**.\n\n---\n\n## 1. UCSI call chain\n\nIn this tree:\n\n```text\nucsi_handle_connector_change()\n  -> ucsi_unregister_partner()\n     -> typec_unregister_partner()\n```\n\nEvidence:\n\n- `drivers/usb/typec/ucsi/ucsi.c:1264` — `ucsi_handle_connector_change()`\n- `drivers/usb/typec/ucsi/ucsi.c:1306-1326` — processes `UCSI_CONSTAT_CONNECT_CHANGE`\n- `drivers/usb/typec/ucsi/ucsi.c:1325` — disconnect path calls:\n\n```c\nucsi_unregister_partner(con);\n```\n\n- `drivers/usb/typec/ucsi/ucsi.c:1138-1154` — `ucsi_unregister_partner()`\n- `drivers/usb/typec/ucsi/ucsi.c:1151` — calls:\n\n```c\ntypec_unregister_partner(con->partner);\n```\n\nThe relevant code is:\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner)\n\t\treturn;\n\n\ttypec_set_mode(con->port, TYPEC_STATE_SAFE);\n\t...\n\ttypec_unregister_partner(con->partner);\n\t...\n\tcon->partner = NULL;\n}\n```\n\nThus the reported stack is consistent with the normal UCSI disconnect path.\n\n---\n\n## 2. Type-C partner teardown\n\n`drivers/usb/typec/class.c:1174-1196` contains `typec_unregister_partner()`:\n\n```c\nmutex_lock(&port->partner_link_lock);\nif (port->usb2_dev) {\n\ttypec_partner_unlink_device(partner, port->usb2_dev);\n\tport->usb2_dev = NULL;\n}\nif (port->usb3_dev) {\n\ttypec_partner_unlink_device(partner, port->usb3_dev);\n\tport->usb3_dev = NULL;\n}\n\ndevice_unregister(&partner->dev);\nmutex_unlock(&port->partner_link_lock);\n```\n\nThe important helper is `drivers/usb/typec/class.c:906-913`:\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n\t\t\t\t\tstruct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");\n\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n```\n\nThe warning concerns the second removal:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThe `typec` link is created on the USB device by `typec_partner_link_device()` at `drivers/usb/usb/typec/class.c:890-904`:\n\n```c\nsysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n```\n\nThe Type-C class stores the enumerated USB device in:\n\n- `drivers/usb/typec/class.c:2146-2167`, `typec_partner_attach()`\n- `port->usb2_dev = dev` or `port->usb3_dev = dev`\n\nThe corresponding detach callback is:\n\n- `drivers/usb/typec/class.c:2169-2186`, `typec_partner_deattach()`\n- installed at `drivers/usb/typec/class.c:2753`:\n\n```c\nport->con.deattach = typec_partner_deattach;\n```\n\n`typec_partner_deattach()` removes the Type-C link and clears the cached USB-device pointer:\n\n```c\nif (partner) {\n\ttypec_partner_unlink_device(partner, dev);\n\tput_device(&partner->dev);\n}\n\nif (port->usb2_dev == dev)\n\tport->usb2_dev = NULL;\nelse if (port->usb3_dev == dev)\n\tport->usb3_dev = NULL;\n```\n\n---\n\n## 3. Root cause: `connector_unbind()` fails to detach the Type-C device\n\nThe USB component binding path is in `drivers/usb/core/port.c`.\n\n`connector_bind()` at `port.c:695-720` does the expected Type-C attach:\n\n```c\nport_dev->connector = data;\n\nif (port_dev->child)\n\ttypec_attach(port_dev->connector, &port_dev->child->dev);\n```\n\nHowever, `connector_unbind()` at `port.c:722-729` currently does this:\n\n```c\nstatic void connector_unbind(struct device *dev, struct device *connector,\n\t\t\t     void *data)\n{\n\tstruct usb_port *port_dev = to_usb_port(dev);\n\n\tsysfs_remove_link(&connector->kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"connector\");\n\tport_dev->connector = NULL;\n}\n```\n\nIt removes the component links and immediately clears `port_dev->connector`, but it does **not** call:\n\n```c\ntypec_deattach(port_dev->connector, &port_dev->child->dev);\n```\n\nThat omission leaves the Type-C class's cached `port->usb2_dev` or `port->usb3_dev` pointing at the USB device.\n\nLater, `usb_disconnect()` in `drivers/usb/core/hub.c:2363` attempts:\n\n```c\ntypec_deattach(port_dev->connector, &udev->dev);\n```\n\nBut `connector_unbind()` has already set `port_dev->connector = NULL`, so the inline helper in `include/linux/usb/typec.h:410-414` does nothing:\n\n```c\nstatic inline void typec_deattach(struct typec_connector *con,\n\t\t\t\t  struct device *dev)\n{\n\tif (con && con->deattach)\n\t\tcon->deattach(con, dev);\n}\n```\n\nTherefore `typec_partner_deattach()` is never called, and the Type-C class retains the stale USB-device pointer.\n\nThe later UCSI work item then reaches `typec_unregister_partner()`, which reads that stale pointer and calls `sysfs_remove_link(&dev->kobj, \"typec\")`.\n\n---\n\n## 4. Why kernfs says “no directory”\n\n`drivers/usb/typec/class.c:909` calls:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\n`fs/sysfs/symlink.c:143-155` obtains the kobject's kernfs directory:\n\n```c\nif (!kobj)\n\tparent = sysfs_root_kn;\nelse\n\tparent = kobj->sd;\n\nkernfs_remove_by_name(parent, name);\n```\n\nThe USB device is already being removed or has had its sysfs representation detached. Therefore `dev->kobj.sd` can be `NULL`.\n\n`kernfs_remove_by_name()` resolves to `kernfs_remove_by_name_ns()`, whose implementation is in `fs/kernfs/dir.c:1724-1752`:\n\n```c\nif (!parent) {\n\tWARN(1, KERN_WARNING\n\t     \"kernfs: can not remove '%s', no directory\\n\", name);\n\treturn -ENOENT;\n}\n```\n\nHence:\n\n```text\nkernfs: can not remove 'typec', no directory\n```\n\nmeans that the parent kernfs directory passed to the removal operation is already gone. It is not merely the ordinary “symlink name was absent” case: the warning specifically comes from the `!parent` branch.\n\nThe complete chain is:\n\n```text\nconnector_unbind()\n  port.c:722-729\n    port_dev->connector = NULL\n    [missing typec_deattach()]\n\nusb device teardown\n  hub.c:2363\n    typec_deattach(NULL, &udev->dev)\n    [no-op]\n\nUCSI disconnect work\n  ucsi.c:1264\n    ucsi_unregister_partner()\n      ucsi.c:1325 / 1138-1154\n        typec_unregister_partner()\n          class.c:1185/1189\n            typec_partner_unlink_device()\n              class.c:909\n                sysfs_remove_link(&dev->kobj, \"typec\")\n                  kernfs_remove_by_name_ns()\n                    WARN(... \"no directory\")\n```\n\n---\n\n## 5. Is the fix present in this tree?\n\n### The locking fix is present\n\nThis tree already contains the earlier Type-C locking fix:\n\n```text\nec27386de23a511008c53aa2f3434ad180a3ca9a\nusb: typec: class: Fix NULL pointer access\n```\n\nIts changes are reflected here:\n\n- `partner_link_lock` is initialized at `class.c:2748`\n- `typec_partner_attach()` locks it at `class.c:2139`\n- `typec_partner_deattach()` locks it at `class.c:2174`\n- `typec_unregister_partner()` locks it at `class.c:1183`\n\nThat fix prevents concurrent manipulation of the cached USB-device pointers, but it does not repair the missing detach in `connector_unbind()`.\n\n### The relevant race fix is absent\n\nThe upstream fix is:\n\n```text\ne0b291fe117964037e0ba382eff4bb365d531c3a\nusb: core: port: Deattach Type-C connector on component unbind\n```\n\nIt adds to `drivers/usb/core/port.c::connector_unbind()`:\n\n```c\nif (port_dev->child)\n\ttypec_deattach(port_dev->connector, &port_dev->child->dev);\n```\n\nbefore:\n\n```c\nport_dev->connector = NULL;\n```\n\nThe corrected ordering is therefore:\n\n```c\nsysfs_remove_link(&connector->kobj, dev_name(dev));\nsysfs_remove_link(&dev->kobj, \"connector\");\n\nif (port_dev->child)\n\ttypec_deattach(port_dev->connector, &port_dev->child->dev);\n\nport_dev->connector = NULL;\n```\n\nThe commit identifies the original regression as:\n\n```text\nFixes: 11110783f5ea\n(\"usb: Inform the USB Type-C class about enumerated devices\")\n```\n\nand is marked for stable backporting.\n\n## Final assessment\n\n- **Root cause:** missing `typec_deattach()` in `drivers/usb/core/port.c::connector_unbind()`.\n- **Offending Type-C functions:** `typec_partner_attach()`, `typec_partner_deattach()`, `typec_partner_unlink_device()`, and `typec_unregister_partner()` in `drivers/usb/typec/class.c`.\n- **UCSI trigger:** `ucsi_handle_connector_change()` → `ucsi_unregister_partner()` in `drivers/usb/typec/ucsi/ucsi.c`.\n- **Why ENOENT:** the cached USB device's sysfs/kernfs directory has already been detached; `sysfs_remove_link()` passes a `NULL` parent to `kernfs_remove_by_name_ns()`.\n- **Fix status:** the locking fix is in this tree; the actual component-unbind fix `e0b291fe117964037e0ba382eff4bb365d531c3a` is not."
+      "content": "## Conclusion\n\nThe warning is caused by a **USB Type-C connector teardown race**, not by a UCSI protocol error or a Dell-specific firmware-created missing directory.\n\nThe stale state is created in `drivers/usb/core/port.c::connector_unbind()`: it clears `port_dev->connector` without first calling `typec_deattach()`. Consequently, the Type-C class retains `port->usb2_dev`/`port->usb3_dev` after the USB device's sysfs kobject has begun teardown. Later, UCSI unregisters the partner and tries to remove the already-detached device-side `typec` symlink.\n\nThe upstream fix exists, but it is **not present in this tree**.\n\n---\n\n## 1. UCSI call chain\n\nIn this tree:\n\n```text\nucsi_handle_connector_change()\n  -> ucsi_unregister_partner()\n     -> typec_unregister_partner()\n```\n\nEvidence:\n\n- `drivers/usb/typec/ucsi/ucsi.c:1264` — `ucsi_handle_connector_change()`\n- `drivers/usb/typec/ucsi/ucsi.c:1306-1326` — processes `UCSI_CONSTAT_CONNECT_CHANGE`\n- `drivers/usb/typec/ucsi/ucsi.c:1325` — disconnect path calls:\n\n```c\nucsi_unregister_partner(con);\n```\n\n- `drivers/usb/typec/ucsi/ucsi.c:1138-1154` — `ucsi_unregister_partner()`\n- `drivers/usb/typec/ucsi/ucsi.c:1151` — calls:\n\n```c\ntypec_unregister_partner(con->partner);\n```\n\nThe relevant code is:\n\n```c\nstatic void ucsi_unregister_partner(struct ucsi_connector *con)\n{\n\tif (!con->partner)\n\t\treturn;\n\n\ttypec_set_mode(con->port, TYPEC_STATE_SAFE);\n\t...\n\ttypec_unregister_partner(con->partner);\n\t...\n\tcon->partner = NULL;\n}\n```\n\nThus the reported stack is consistent with the normal UCSI disconnect path.\n\n---\n\n## 2. Type-C partner teardown\n\n`drivers/usb/typec/class.c:1174-1196` contains `typec_unregister_partner()`:\n\n```c\nmutex_lock(&port->partner_link_lock);\nif (port->usb2_dev) {\n\ttypec_partner_unlink_device(partner, port->usb2_dev);\n\tport->usb2_dev = NULL;\n}\nif (port->usb3_dev) {\n\ttypec_partner_unlink_device(partner, port->usb3_dev);\n\tport->usb3_dev = NULL;\n}\n\ndevice_unregister(&partner->dev);\nmutex_unlock(&port->partner_link_lock);\n```\n\nThe important helper is `drivers/usb/typec/class.c:906-913`:\n\n```c\nstatic void typec_partner_unlink_device(struct typec_partner *partner,\n\t\t\t\t\tstruct device *dev)\n{\n\tsysfs_remove_link(&partner->dev.kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"typec\");\n\n\tif (partner->deattach)\n\t\tpartner->deattach(partner, dev);\n}\n```\n\nThe warning concerns the second removal:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\nThe `typec` link is created on the USB device by `typec_partner_link_device()` at `drivers/usb/usb/typec/class.c:890-904`:\n\n```c\nsysfs_create_link(&dev->kobj, &partner->dev.kobj, \"typec\");\n```\n\nThe Type-C class stores the enumerated USB device in:\n\n- `drivers/usb/typec/class.c:2146-2167`, `typec_partner_attach()`\n- `port->usb2_dev = dev` or `port->usb3_dev = dev`\n\nThe corresponding detach callback is:\n\n- `drivers/usb/typec/class.c:2169-2186`, `typec_partner_deattach()`\n- installed at `drivers/usb/typec/class.c:2753`:\n\n```c\nport->con.deattach = typec_partner_deattach;\n```\n\n`typec_partner_deattach()` removes the Type-C link and clears the cached USB-device pointer:\n\n```c\nif (partner) {\n\ttypec_partner_unlink_device(partner, dev);\n\tput_device(&partner->dev);\n}\n\nif (port->usb2_dev == dev)\n\tport->usb2_dev = NULL;\nelse if (port->usb3_dev == dev)\n\tport->usb3_dev = NULL;\n```\n\n---\n\n## 3. Root cause: `connector_unbind()` fails to detach the Type-C device\n\nThe USB component binding path is in `drivers/usb/core/port.c`.\n\n`connector_bind()` at `port.c:695-720` does the expected Type-C attach:\n\n```c\nport_dev->connector = data;\n\nif (port_dev->child)\n\ttypec_attach(port_dev->connector, &port_dev->child->dev);\n```\n\nHowever, `connector_unbind()` at `port.c:722-729` currently does this:\n\n```c\nstatic void connector_unbind(struct device *dev, struct device *connector,\n\t\t\t     void *data)\n{\n\tstruct usb_port *port_dev = to_usb_port(dev);\n\n\tsysfs_remove_link(&connector->kobj, dev_name(dev));\n\tsysfs_remove_link(&dev->kobj, \"connector\");\n\tport_dev->connector = NULL;\n}\n```\n\nIt removes the component links and immediately clears `port_dev->connector`, but it does **not** call:\n\n```c\ntypec_deattach(port_dev->connector, &port_dev->child->dev);\n```\n\nThat omission leaves the Type-C class's cached `port->usb2_dev` or `port->usb3_dev` pointing at the USB device.\n\nLater, `usb_disconnect()` in `drivers/usb/core/hub.c:2363` attempts:\n\n```c\ntypec_deattach(port_dev->connector, &udev->dev);\n```\n\nBut `connector_unbind()` has already set `port_dev->connector = NULL`, so the inline helper in `include/linux/usb/typec.h:410-414` does nothing:\n\n```c\nstatic inline void typec_deattach(struct typec_connector *con,\n\t\t\t\t  struct device *dev)\n{\n\tif (con && con->deattach)\n\t\tcon->deattach(con, dev);\n}\n```\n\nTherefore `typec_partner_deattach()` is never called, and the Type-C class retains the stale USB-device pointer.\n\nThe later UCSI work item then reaches `typec_unregister_partner()`, which reads that stale pointer and calls `sysfs_remove_link(&dev->kobj, \"typec\")`.\n\n---\n\n## 4. Why kernfs says “no directory”\n\n`drivers/usb/typec/class.c:909` calls:\n\n```c\nsysfs_remove_link(&dev->kobj, \"typec\");\n```\n\n`fs/sysfs/symlink.c:143-155` obtains the kobject's kernfs directory:\n\n```c\nif (!kobj)\n\tparent = sysfs_root_kn;\nelse\n\tparent = kobj->sd;\n\nkernfs_remove_by_name(parent, name);\n```\n\nThe USB device is already being removed or has had its sysfs representation detached. Therefore `dev->kobj.sd` can be `NULL`.\n\n`kernfs_remove_by_name()` resolves to `kernfs_remove_by_name_ns()`, whose implementation is in `fs/kernfs/dir.c:1724-1752`:\n\n```c\nif (!parent) {\n\tWARN(1, KERN_WARNING\n\t     \"kernfs: can not remove '%s', no directory\\n\", name);\n\treturn -ENOENT;\n}\n```\n\nHence:\n\n```text\nkernfs: can not remove 'typec', no directory\n```\n\nmeans that the parent kernfs directory passed to the removal operation is already gone. It is not merely the ordinary “symlink name was absent” case: the warning specifically comes from the `!parent` branch.\n\nThe complete chain is:\n\n```text\nconnector_unbind()\n  port.c:722-729\n    port_dev->connector = NULL\n    [missing typec_deattach()]\n\nusb device teardown\n  hub.c:2363\n    typec_deattach(NULL, &udev->dev)\n    [no-op]\n\nUCSI disconnect work\n  ucsi.c:1264\n    ucsi_unregister_partner()\n      ucsi.c:1325 / 1138-1154\n        typec_unregister_partner()\n          class.c:1185/1189\n            typec_partner_unlink_device()\n              class.c:909\n                sysfs_remove_link(&dev->kobj, \"typec\")\n                  kernfs_remove_by_name_ns()\n                    WARN(... \"no directory\")\n```\n\n---\n\n## 5. Is the fix present in this tree?\n\n### The locking fix is present\n\nThis tree already contains the earlier Type-C locking fix:\n\n```text\nec27386de23a511008c53aa2f3434ad180a3ca9a\nusb: typec: class: Fix NULL pointer access\n```\n\nIts changes are reflected here:\n\n- `partner_link_lock` is initialized at `class.c:2748`\n- `typec_partner_attach()` locks it at `class.c:2139`\n- `typec_partner_deattach()` locks it at `class.c:2174`\n- `typec_unregister_partner()` locks it at `class.c:1183`\n\nThat fix prevents concurrent manipulation of the cached USB-device pointers, but it does not repair the missing detach in `connector_unbind()`.\n\n### The relevant race fix is absent\n\nThe upstream fix is:\n\n```text\ne0b291fe117964037e0ba382eff4bb365d531c3a\nusb: core: port: Deattach Type-C connector on component unbind\n```\n\nIt adds to `drivers/usb/core/port.c::connector_unbind()`:\n\n```c\nif (port_dev->child)\n\ttypec_deattach(port_dev->connector, &port_dev->child->dev);\n```\n\nbefore:\n\n```c\nport_dev->connector = NULL;\n```\n\nThe corrected ordering is therefore:\n\n```c\nsysfs_remove_link(&connector->kobj, dev_name(dev));\nsysfs_remove_link(&dev->kobj, \"connector\");\n\nif (port_dev->child)\n\ttypec_deattach(port_dev->connector, &port_dev->child->dev);\n\nport_dev->connector = NULL;\n```\n\nThe commit identifies the original regression as:\n\n```text\nFixes: 11110783f5ea\n(\"usb: Inform the USB Type-C class about enumerated devices\")\n```\n\nand is marked for stable backporting.\n\n## Final assessment\n\n- **Root cause:** missing `typec_deattach()` in `drivers/usb/core/port.c::connector_unbind()`.\n- **Offending Type-C functions:** `typec_partner_attach()`, `typec_partner_deattach()`, `typec_partner_unlink_device()`, and `typec_unregister_partner()` in `drivers/usb/typec/class.c`.\n- **UCSI trigger:** `ucsi_handle_connector_change()` → `ucsi_unregister_partner()` in `drivers/usb/typec/ucsi/ucsi.c`.\n- **Why ENOENT:** the cached USB device's sysfs/kernfs directory has already been detached; `sysfs_remove_link()` passes a `NULL` parent to `kernfs_remove_by_name_ns()`.\n- **Fix status:** the locking fix is in this tree; the actual component-unbind fix `e0b291fe117964037e0ba382eff4bb365d531c3a` is not.",
+      "usage": {
+        "input": 3,
+        "output": 2718,
+        "cacheRead": 64230,
+        "cacheWrite": 3506,
+        "reasoning": 285,
+        "totalTokens": 70457,
+        "cost": {
+          "input": 3.0000000000000004e-07,
+          "output": 0.0016308,
+          "cacheRead": 0.0006423,
+          "cacheWrite": 0.00043825,
+          "total": 0.00271165
+        }
+      }
     }
   ],
   "aggregate": {
