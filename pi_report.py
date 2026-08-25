@@ -341,46 +341,62 @@ def _cell_html(value, key, best, worst, n=None, sd=None):
 
 
 def _overview_html(rows):
-    """Overview table (req 2): tool@version | total tokens | api calls | Δ vs grep.
+    """Overview table (req 2): tool@version | avg tokens | api calls | Δ vs grep.
 
     Also shows the mean elapsed (wall_s) per tool so runtime cost is visible
-    next to token cost — averaged over the same runs as total tokens. Each
-    metric cell shows (n=N) = how many validated runs the mean rests on.
+    next to token cost. Tokens/api/elapsed are each averaged across testcases
+    (mean of per-testcase means) rather than summed, since different
+    testcases/tools don't share the same n runs and a raw sum would let a
+    heavily-retried cell dominate. Each metric cell shows (n=N) = how many
+    validated runs it rests on (summed across testcases, for context).
     """
     by_tool = {}
     for r in rows:
         b = by_tool.setdefault(r["tool_id"], {
-            "total": 0.0, "api": 0, "wall": [], "n": 0, "n_runs": 0,
+            "total": [], "api": [], "wall": [], "n_runs": 0,
             "model": set(), "tool": r.get("tool"),
         })
-        b["total"] += float(r["cells"].get("total") or 0)
-        b["api"] += int(r["cells"].get("api") or 0)
+        t = r["cells"].get("total")
+        if t is not None:
+            b["total"].append(float(t))
+        a = r["cells"].get("api")
+        if a is not None:
+            b["api"].append(float(a))
         w = r["cells"].get("wall_s")
         if w is not None:
             b["wall"].append(float(w))
-            b["n"] += 1
         # Run count behind this cell (mirrors per-metric n in summary.json).
         # All BASE_COLS metrics in a cell share the same run set.
         cell_n = r.get("cell_n") or {}
         b["n_runs"] += cell_n.get("total") or cell_n.get("wall_s") or 0
         b["model"].add(r["model"])
-    grep_total = by_tool.get(BASELINE_TOOL, {}).get("total") or next(
-        (v["total"] for k, v in by_tool.items() if k.startswith(BASELINE_TOOL + "@")), None)
-    items = sorted(by_tool.items(), key=lambda kv: kv[1]["total"])
-    total_max = max((v["total"] for v in by_tool.values()), default=0)
-    api_max = max((v["api"] for v in by_tool.values()), default=0)
-    wall_max = max((sum(v["wall"]) / v["n"] for v in by_tool.values() if v["n"]), default=0)
-    best_t = min(by_tool.values(), key=lambda v: v["total"])["total"] if by_tool else 0
-    best_a = min(by_tool.values(), key=lambda v: v["api"])["api"] if by_tool else 0
-    best_w = min((sum(v["wall"]) / v["n"] for v in by_tool.values() if v["n"]), default=0)
-    thead = ("<tr><th>tool@version</th><th>total tokens</th><th>api calls</th>"
+
+    def _avg(vals):
+        return (sum(vals) / len(vals)) if vals else None
+
+    means = {tid: {
+        "total": _avg(v["total"]), "api": _avg(v["api"]), "wall": _avg(v["wall"]),
+        "model": v["model"], "tool": v["tool"], "n_runs": v["n_runs"],
+    } for tid, v in by_tool.items()}
+    grep_total = means.get(BASELINE_TOOL, {}).get("total") or next(
+        (v["total"] for k, v in means.items() if k.startswith(BASELINE_TOOL + "@")), None)
+    items = sorted(means.items(), key=lambda kv: (kv[1]["total"] is None, kv[1]["total"]))
+    total_vals = [v["total"] for v in means.values() if v["total"] is not None]
+    api_vals = [v["api"] for v in means.values() if v["api"] is not None]
+    wall_vals = [v["wall"] for v in means.values() if v["wall"] is not None]
+    total_max = max(total_vals, default=0)
+    api_max = max(api_vals, default=0)
+    wall_max = max(wall_vals, default=0)
+    best_t = min(total_vals, default=0)
+    best_a = min(api_vals, default=0)
+    best_w = min(wall_vals, default=0)
+    thead = ("<tr><th>tool@version</th><th>avg tokens</th><th>avg api calls</th>"
              "<th>elapsed (s)</th><th>Δ vs grep</th></tr>")
     body = []
     for tid, v in items:
         tcl = "best" if v["total"] == best_t else ("worst" if v["total"] == total_max and total_max != best_t else "")
         acl = "best" if v["api"] == best_a else ("worst" if v["api"] == api_max and api_max != best_a else "")
-        wmean = (sum(v["wall"]) / v["n"]) if v["n"] else None
-        wcl = "best" if wmean is not None and wmean == best_w else ("worst" if wmean is not None and wmean == wall_max and wall_max != best_w else "")
+        wcl = "best" if v["wall"] is not None and v["wall"] == best_w else ("worst" if v["wall"] is not None and v["wall"] == wall_max and wall_max != best_w else "")
         pct, dcls = _delta_pct(v["total"], grep_total)
         delta = "+0%" if tid == BASELINE_TOOL or v.get("tool") == BASELINE_TOOL else ("" if pct is None else f"{pct:+.0f}%")
         nm = " <span class='mrk'>" + ", ".join(sorted(v["model"])) + "</span>" if len(v["model"]) > 1 else ""
@@ -388,15 +404,16 @@ def _overview_html(rows):
         body.append(
             f"<tr><td><b>{_esc(tid)}</b>{nm}</td>"
             f"<td class='num {tcl}'>{fmt_num(v['total'])}{n_mark}</td>"
-            f"<td class='num {acl}'>{v['api']}{n_mark}</td>"
-            f"<td class='num {wcl}'>{fmt_num(wmean)}{n_mark}</td>"
+            f"<td class='num {acl}'>{fmt_num(v['api'])}{n_mark}</td>"
+            f"<td class='num {wcl}'>{fmt_num(v['wall'])}{n_mark}</td>"
             f"<td class='num {dcls}'>{delta}</td></tr>"
         )
     return ("<h1>Overview</h1>"
             "<p>Aggregated across all testcases and models, cheapest -> costliest "
-            "(best green, worst red). Δ vs grep on total tokens; elapsed is the "
-            "mean wall-clock per run, and (n=N) shows the number of validated "
-            "runs each mean rests on.</p>"
+            "(best green, worst red). Tokens/api calls/elapsed are each the mean "
+            "of per-testcase means (not a sum, since testcases/tools don't share "
+            "the same run counts). Δ vs grep on avg tokens, and (n=N) shows the "
+            "total number of validated runs behind each row.</p>"
             "<table class='ov'><thead>" + thead + "</thead><tbody>"
             + "".join(body) + "</tbody></table>")
 
