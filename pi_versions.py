@@ -33,7 +33,11 @@ VERSION_BIN = {
 }
 
 _KERNEL_DIR = os.environ.get("KERNEL_DIR", "/workspace/linux")
-DOCKER_IMAGE = os.environ.get("BENCH_IMAGE") or os.environ.get("DOCKER_IMAGE", "")
+# Must match pi_runner.BENCH_IMAGE's default so docker-only tools (rtk,
+# codegraph, codebase-memory-mcp) can still be version-probed inside the
+# image even when BENCH_IMAGE/DOCKER_IMAGE isn't explicitly exported.
+DOCKER_IMAGE = (os.environ.get("BENCH_IMAGE") or os.environ.get("DOCKER_IMAGE")
+                or "agent-codebase-bench")
 
 # Some tools install off-PATH (repowise lives in a venv); try these too.
 CANDIDATE_PATHS = {
@@ -153,7 +157,11 @@ def tool_version(tool, backend="native"):
         # A concrete, stable per-tree version: short hash.
         # We surface the commit timestamp too so the exact commit is findable.
         return h, "kernel_git"
-    return "n/a", "n/a"
+    # "n/a" is never allowed here: it's embedded verbatim into directory/file
+    # names as f"{tool}@{version}" (e.g. "rtk@n/a"), and the embedded slash
+    # silently creates an extra unmade path component, crashing open() later.
+    # Use a slash-free sentinel instead.
+    return "unknown", "n/a"
 
 
 def tool_version_meta(tool, backend="native"):

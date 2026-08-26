@@ -209,6 +209,12 @@ def run_cell(cfg, tool, prompt, tool_version, version_source, run_ts,
     transcript.jsonl} and appends the run row to runs.json in results_dir.
     """
     v = tool_version or "n/a"
+    # Defense in depth: version strings become path components
+    # (f"{tool}@{v}" is a directory name). A stray "/" would silently insert
+    # an extra unmade path level and crash open() far below with a confusing
+    # FileNotFoundError. Flatten any slash so this can never happen even if a
+    # tool's --version banner or the "n/a" sentinel contains one.
+    v = v.replace("/", "_")
     tool_id = f"{tool}@{v}"
     os.makedirs(results_dir, exist_ok=True)
     run_id = f"{tool_id}-{prompt['id']}-{run_ts}"
