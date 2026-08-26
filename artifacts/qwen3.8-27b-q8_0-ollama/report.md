@@ -2,6 +2,9 @@
 Averages over all runs, by tool@version × prompt (run notes: mean, n runs).
 | tool@version | prompt | runs | total | in | out | cache | reas | api | cost_usd | wall_s | tcaps |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| codebase-memory-mcp@0.10.2 | callers-drm-register | 1 | 261515 (n=1, sd=0) | 252964 (n=1, sd=0) | 8551 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 22 (n=1, sd=0) | 0 (n=1, sd=0) | 671.779 (n=1, sd=0) | 46 (n=1, sd=0) |
+| codebase-memory-mcp@0.10.2 | pm-suspend-trace | 1 | 159600 (n=1, sd=0) | 152766 (n=1, sd=0) | 6834 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 16 (n=1, sd=0) | 0 (n=1, sd=0) | 405.17 (n=1, sd=0) | 35 (n=1, sd=0) |
+| codebase-memory-mcp@0.10.2 | typec-kernfs-ucsi-rootcause | 1 | 516985 (n=1, sd=0) | 480804 (n=1, sd=0) | 36181 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 21 (n=1, sd=0) | 0 (n=1, sd=0) | 1760.69 (n=1, sd=0) | 40 (n=1, sd=0) |
 | codegraph@1.5.0 | callers-drm-register | 2 | 117279 (n=2, sd=31295.1) | 113486 (n=2, sd=33063.6) | 3793.5 (n=2, sd=1768.47) | 0 (n=2, sd=0) | 0 (n=2, sd=0) | 4.5 (n=2, sd=0.7071) | 0 (n=2, sd=0) | 357.558 (n=2, sd=58.7167) | 6 (n=2, sd=1.4142) |
 | codegraph@1.5.0 | pm-suspend-trace | 2 | 138039 (n=2, sd=80031.8) | 133666 (n=2, sd=79985.8) | 4373.5 (n=2, sd=45.9619) | 0 (n=2, sd=0) | 0 (n=2, sd=0) | 4.5 (n=2, sd=2.1213) | 0 (n=2, sd=0) | 407.784 (n=2, sd=79.7496) | 6 (n=2, sd=1.4142) |
 | codegraph@1.5.0 | typec-kernfs-ucsi-rootcause | 2 | 194800 (n=2, sd=30131.9) | 178270 (n=2, sd=28368.4) | 16530 (n=2, sd=1763.52) | 0 (n=2, sd=0) | 0 (n=2, sd=0) | 5 (n=2, sd=0) | 0 (n=2, sd=0) | 1099.51 (n=2, sd=137.573) | 8 (n=2, sd=1.4142) |
@@ -14,4 +17,6 @@ Averages over all runs, by tool@version × prompt (run notes: mean, n runs).
 | ripgrep@15.2.0 | callers-drm-register | 2 | 38438 (n=2, sd=16959.2) | 35033 (n=2, sd=15696.4) | 3405 (n=2, sd=1262.89) | 0 (n=2, sd=0) | 0 (n=2, sd=0) | 8.5 (n=2, sd=2.1213) | 0 (n=2, sd=0) | 185.339 (n=2, sd=66.6766) | 13 (n=2, sd=7.0711) |
 | ripgrep@15.2.0 | pm-suspend-trace | 2 | 510284 (n=2, sd=131021) | 497103 (n=2, sd=128948) | 13181.5 (n=2, sd=2072.53) | 0 (n=2, sd=0) | 0 (n=2, sd=0) | 32 (n=2, sd=5.6569) | 0 (n=2, sd=0) | 718.356 (n=2, sd=115.307) | 47 (n=2, sd=1.4142) |
 | ripgrep@15.2.0 | typec-kernfs-ucsi-rootcause | 1 | 859192 (n=1, sd=0) | 833465 (n=1, sd=0) | 25727 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 44 (n=1, sd=0) | 0 (n=1, sd=0) | 1397.82 (n=1, sd=0) | 55 (n=1, sd=0) |
-| rtk@0.45.0 | pm-suspend-trace | 1 | 1.54076e+06 (n=1, sd=0) | 1.51276e+06 (n=1, sd=0) | 27998 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 60 (n=1, sd=0) | 0 (n=1, sd=0) | 1541.63 (n=1, sd=0) | 113 (n=1, sd=0) |
+| rtk@0.45.0 | callers-drm-register | 1 | 1.01904e+06 (n=1, sd=0) | 983497 (n=1, sd=0) | 35546 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 42 (n=1, sd=0) | 0 (n=1, sd=0) | 1624.7 (n=1, sd=0) | 123 (n=1, sd=0) |
+| rtk@0.45.0 | pm-suspend-trace | 2 | 1.3211e+06 (n=2, sd=310640) | 1.29458e+06 (n=2, sd=308550) | 26520 (n=2, sd=2090.21) | 0 (n=2, sd=0) | 0 (n=2, sd=0) | 62 (n=2, sd=2.8284) | 0 (n=2, sd=0) | 1336.71 (n=2, sd=289.811) | 107 (n=2, sd=8.4853) |
+| rtk@0.45.0 | typec-kernfs-ucsi-rootcause | 1 | 7.055e+06 (n=1, sd=0) | 6.97779e+06 (n=1, sd=0) | 77209 (n=1, sd=0) | 0 (n=1, sd=0) | 0 (n=1, sd=0) | 129 (n=1, sd=0) | 0 (n=1, sd=0) | 4010.99 (n=1, sd=0) | 267 (n=1, sd=0) |
