@@ -51,9 +51,10 @@ PROBE_EXT = "/opt/pi-bench/extensions/bench-tools/index.ts"
 # them after the container finishes so mounts never dangle.
 _MODELS_JSON_PENDING = []
 
-# Per-cell runtime limit (seconds); override with PI_CELL_TIMEOUT. Default 1800s
-# (30 min) may be too short for the deep typec root-cause cells.
-CELL_TIMEOUT = int(os.environ.get("PI_CELL_TIMEOUT", "1800"))
+# Per-cell runtime limit (seconds); override with PI_CELL_TIMEOUT. Default
+# 5400s (90 min): the deep typec-kernfs-ucsi-rootcause cell has been observed
+# taking ~4000s against a local Ollama model, so 1800s was too short.
+CELL_TIMEOUT = int(os.environ.get("PI_CELL_TIMEOUT", "5400"))
 
 # Ollama needs pi's models.json to declare the local/remote provider (pi 0.84.1
 # has no built-in ollama discovery). The runner generates a private models.json
